@@ -169,9 +169,17 @@ public class BAMRecordReader
 	@Override public LongWritable      getCurrentKey  () { return key; }
 	@Override public SAMRecordWritable getCurrentValue() { return record; }
 
+  int progCounter = 0;
+
 	@Override public boolean nextKeyValue() {
 		if (bci.getFilePointer() >= virtualEnd)
 			return false;
+
+    if (progCounter++ > 100000) {
+      progCounter = 0;
+      System.err.println(getClass() + " virtPos: " + bci.getFilePointer());
+      System.err.println(getClass() + " progress: " + getProgress());
+    }
 
 		final SAMRecord r = codec.decode();
 		if (r == null)
