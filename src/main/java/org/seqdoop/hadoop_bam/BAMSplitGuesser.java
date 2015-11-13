@@ -305,6 +305,7 @@ public class BAMSplitGuesser {
 		up += 4;
 
 		try {
+			outer:
 			while (up + SHORTEST_POSSIBLE_BAM_RECORD - 4 < cSize) {
 				bgzf.seek(cpVirt | up);
 				bgzf.read(buf.array(), 0, 8);
@@ -373,9 +374,8 @@ public class BAMSplitGuesser {
 					continue;
 				}
 
-				// All of [4], [24], and [36 + [12]&0xff] look good. If [0] is also
-				// sensible, that's good enough for us. "Sensible" to us means the
-				// following:
+				// All of [4], [24], and [36 + [12]&0xff] look good. Next check if [0] is also
+				// sensible. "Sensible" to us means the following:
 				//
 				// [0] >= 4*([16]&0xffff) + [20] + ([20]+1)/2 + 4*8 + ([12]&0xff)
 
@@ -386,7 +386,8 @@ public class BAMSplitGuesser {
 				bgzf.seek(cpVirt | up+16);
 				bgzf.read(buf.array(), 0, 8);
 
-				zeroMin += (buf.getInt(0) & 0xffff) * 4;
+				int numCigarOps = buf.getInt(0) & 0xffff;
+				zeroMin += numCigarOps * 4;
 				zeroMin += buf.getInt(4) + (buf.getInt(4)+1)/2;
 
 				bgzf.seek(cpVirt | up);
@@ -395,6 +396,16 @@ public class BAMSplitGuesser {
 				if (buf.getInt(0) < zeroMin) {
 					up = nextUP;
 					continue;
+				}
+
+				// Check cigars are in range of 0-8
+				bgzf.seek(cpVirt | nullTerminator + 1);
+				for (int i = 0; i < numCigarOps; i++) {
+					bgzf.read(buf.array(), 0, 4);
+					if ((buf.getInt(0) & 0xf) > 8) {
+						up = nextUP;
+						continue outer;
+					}
 				}
 				return up;
 			}
