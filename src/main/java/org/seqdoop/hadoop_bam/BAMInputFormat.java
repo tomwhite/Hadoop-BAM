@@ -60,7 +60,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import htsjdk.samtools.BAMIndex;
 import htsjdk.samtools.seekablestream.SeekableStream;
 
 import org.apache.hadoop.conf.Configuration;

@@ -5,7 +5,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
 /** A convenience class that you can use as a RecordWriter for CRAM files.
  *

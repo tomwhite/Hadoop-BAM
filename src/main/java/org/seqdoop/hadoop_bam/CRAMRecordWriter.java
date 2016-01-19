@@ -1,16 +1,11 @@
 package org.seqdoop.hadoop_bam;
 
 import java.io.*;
-import java.net.URI;
-import java.nio.file.Paths;
 
 import htsjdk.samtools.CRAMContainerStreamWriter;
-import htsjdk.samtools.SAMTextHeaderCodec;
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.reference.ReferenceSequenceFileFactory;
-import htsjdk.samtools.util.StringLineReader;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;

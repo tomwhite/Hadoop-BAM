@@ -22,7 +22,6 @@
 
 package org.seqdoop.hadoop_bam;
 
-import htsjdk.samtools.util.BlockCompressedInputStream;
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.IOException;

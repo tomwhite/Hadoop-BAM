@@ -25,7 +25,6 @@ package org.seqdoop.hadoop_bam;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMUtils;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
