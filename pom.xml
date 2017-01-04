@@ -357,6 +357,12 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-nio</artifactId>
+            <version>0.9.3-alpha-SNAPSHOT</version>
+            <classifier>shaded</classifier>
+        </dependency>
     </dependencies>
 
     <!-- The following shamelessly copied from ADAM -->
