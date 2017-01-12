@@ -22,11 +22,19 @@
 
 package org.seqdoop.hadoop_bam;
 
+import htsjdk.samtools.BAMFileReader;
+import htsjdk.samtools.BAMIndex;
+import htsjdk.samtools.QueryInterval;
+import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.SamInputResource;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Interval;
-import htsjdk.samtools.util.Locatable;
-import htsjdk.samtools.util.OverlapDetector;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +46,6 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
-import htsjdk.samtools.BAMRecordCodec;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
@@ -60,15 +67,14 @@ public class BAMRecordReader
 
 	private ValidationStringency stringency;
 
+	private Iterator<SAMRecord> iterator;
 	private BlockCompressedInputStream bci;
-	private BAMRecordCodec codec;
 	private long fileStart, virtualStart, virtualEnd;
 	private boolean isInitialized = false;
 	private boolean keepReadPairsTogether;
 	private boolean readPair;
 	private boolean lastOfPair;
 	private List<Interval> intervals;
-	private OverlapDetector<Interval> overlapDetector;
 
 	/** Note: this is the only getKey function that handles unmapped reads
 	 * specially!
@@ -137,23 +143,27 @@ public class BAMRecordReader
 
 		final FSDataInputStream in = fs.open(file);
 
-		final SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(in, conf);
-		codec = new BAMRecordCodec(header);
-
-		in.seek(0);
-		bci =
-			new BlockCompressedInputStream(
-				new WrapSeekable<FSDataInputStream>(
-					in, fs.getFileStatus(file).getLen(), file));
+		Path fileIndex = new Path(file.getParent(), file.getName().replaceFirst("\\.bam$",
+				BAMIndex.BAMIndexSuffix));
+		FSDataInputStream inIndex = fs.exists(fileIndex) ? fs.open(fileIndex) : null;
+		SeekableStream inStream = inIndex == null ? null : new
+				WrapSeekable<>(inIndex, fs.getFileStatus(fileIndex).getLen(), fileIndex);
+		SamReader samReader = createSamReader(new WrapSeekable<>(
+				in, fs.getFileStatus(file).getLen(), file), inStream,
+				stringency);
+		final SAMFileHeader header = samReader.getFileHeader();
 
 		virtualStart = split.getStartVirtualOffset();
 
 		fileStart  = virtualStart >>> 16;
 		virtualEnd = split.getEndVirtualOffset();
 
-		bci.seek(virtualStart);
-		codec.setInputStream(bci);
-		
+
+		SamReader.PrimitiveSamReader primitiveSamReader = ((SamReader
+				.PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
+		BAMFileReader bamFileReader = (BAMFileReader) primitiveSamReader;
+		bci = bamFileReader.getBlockCompressedInputStream(); // get underlying block compressed stream, so we can seek to start of split
+
 		if(BAMInputFormat.DEBUG_BAM_SPLITTER) {
 			final long recordStart = virtualStart & 0xffff;
                 	System.err.println("XXX inizialized BAMRecordReader byte offset: " +
@@ -166,11 +176,86 @@ public class BAMRecordReader
 		lastOfPair = false;
 		intervals = BAMInputFormat.getIntervals(conf);
 		if (intervals != null) {
-			overlapDetector = new OverlapDetector<>(0, 0);
-			overlapDetector.addAll(intervals, intervals);
+			QueryInterval[] queryIntervals = prepareQueryIntervals(intervals, header.getSequenceDictionary());
+			iterator = newIterator(split.getIntervalFilePointers(), queryIntervals, bamFileReader);
+			bci.seek(virtualStart);
+		} else {
+			iterator = samReader.iterator();
+		}
+		bci.seek(virtualStart); // seek after creating iterator since htsjdk seeks to the beginning of stream when creating the iterator
+	}
+
+	private Iterator<SAMRecord> newIterator(long[] intervalFilePointers, QueryInterval[] queryIntervals, BAMFileReader bamFileReader) {
+		return bamFileReader.createIndexIterator(queryIntervals, false, intervalFilePointers);
+	}
+
+	private SamReader createSamReader(SeekableStream in, SeekableStream inIndex,
+			ValidationStringency stringency) {
+		SamReaderFactory readerFactory = SamReaderFactory.makeDefault()
+				.setOption(SamReaderFactory.Option.CACHE_FILE_BASED_INDEXES, true)
+				.setOption(SamReaderFactory.Option.EAGERLY_DECODE, false)
+				.setUseAsyncIo(false);
+		if (stringency != null) {
+			readerFactory.validationStringency(stringency);
+		}
+		SamInputResource resource = SamInputResource.of(in);
+		if (inIndex != null) {
+			resource.index(inIndex);
+		}
+		return readerFactory.open(resource);
+	}
+
+	/**
+	 * Converts a List of SimpleIntervals into the format required by the SamReader query API
+	 * @param rawIntervals SimpleIntervals to be converted
+	 * @return A sorted, merged list of QueryIntervals suitable for passing to the SamReader query API
+	 */
+	// TODO: this is from GATK's SamReaderQueryingIterator
+	public static QueryInterval[] prepareQueryIntervals( final List<Interval>
+			rawIntervals, final SAMSequenceDictionary sequenceDictionary ) {
+		if ( rawIntervals == null || rawIntervals.isEmpty() ) {
+			return null;
 		}
 
+		// This might take a while with large interval lists, so log a status message
+		System.out.println("Preparing intervals for traversal");
+
+		// Convert each SimpleInterval to a QueryInterval
+		final QueryInterval[] convertedIntervals =
+				rawIntervals.stream()
+						.map(rawInterval -> convertSimpleIntervalToQueryInterval(rawInterval, sequenceDictionary))
+						.toArray(QueryInterval[]::new);
+
+		// Intervals must be optimized (sorted and merged) in order to use the htsjdk query API
+		return QueryInterval.optimizeIntervals(convertedIntervals);
 	}
+	/**
+	 * Converts an interval in SimpleInterval format into an htsjdk QueryInterval.
+	 *
+	 * In doing so, a header lookup is performed to convert from contig name to index
+	 *
+	 * @param interval interval to convert
+	 * @param sequenceDictionary sequence dictionary used to perform the conversion
+	 * @return an equivalent interval in QueryInterval format
+	 */
+	// TODO: this is from GATK's SamReaderQueryingIterator
+	public static QueryInterval convertSimpleIntervalToQueryInterval( final Interval interval, final SAMSequenceDictionary sequenceDictionary ) {
+		if (interval == null) {
+			throw new IllegalArgumentException("interval may not be null");
+		}
+		if (sequenceDictionary == null) {
+			throw new IllegalArgumentException("sequence dictionary may not be null");
+		}
+
+		final int contigIndex = sequenceDictionary.getSequenceIndex(interval.getContig());
+		if ( contigIndex == -1 ) {
+			throw new IllegalArgumentException("Contig " + interval.getContig() + " not present in reads sequence " +
+					"dictionary");
+		}
+
+		return new QueryInterval(contigIndex, interval.getStart(), interval.getEnd());
+	}
+
 	@Override public void close() throws IOException { bci.close(); }
 
 	/** Unless the end has been reached, this only takes file position into
@@ -195,9 +280,9 @@ public class BAMRecordReader
 		long virtPos;
 		while ((virtPos = bci.getFilePointer()) < virtualEnd || (keepReadPairsTogether && readPair && !lastOfPair)) {
 
-			final SAMRecord r = codec.decode();
-			if (r == null)
+			if (!iterator.hasNext())
 				return false;
+			final SAMRecord r = iterator.next();
 
 			// Since we're reading from a BAMRecordCodec directly we have to set the
 			// validation stringency ourselves.
@@ -219,34 +304,10 @@ public class BAMRecordReader
 				}
 			}
 
-			if (!overlaps(r)) {
-				continue;
-			}
-
 			key.set(getKey(r));
 			record.set(r);
 			return true;
 		}
 		return false;
-	}
-
-	private boolean overlaps(SAMRecord r) {
-		if (intervals == null ||
-				(r.getReadUnmappedFlag() && r.getAlignmentStart() == SAMRecord.NO_ALIGNMENT_START)) {
-			return true;
-		}
-		if (r.getReadUnmappedFlag()) { // special case for unmapped reads with coordinate set
-			for (Locatable interval : intervals) {
-				if (interval.getStart() <= r.getStart() && interval.getEnd() >= r.getStart()) {
-					// This follows the behavior of htsjdk's SamReader which states that
-					// "an unmapped read will be returned by this call if it has a coordinate for
-					// the purpose of sorting that is in the query region".
-					return true;
-				}
-			}
-		}
-		final Interval interval = new Interval(r.getContig(), r.getStart(), r.getEnd());
-		Collection<Interval> overlaps = overlapDetector.getOverlaps(interval);
-		return !overlaps.isEmpty();
 	}
 }

@@ -25,14 +25,18 @@ package org.seqdoop.hadoop_bam;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.BAMIndex;
 import htsjdk.samtools.Chunk;
+import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -294,11 +298,11 @@ public class BAMInputFormat
 
 		// Get the chunks in the intervals we want (chunks give start and end file pointers
 		// into a BAM file) by looking in all the indexes for the BAM files
-		List<Chunk> chunks = new ArrayList<Chunk>();
 		Set<Path> bamFiles = new LinkedHashSet<Path>();
 		for (InputSplit split : splits) {
 			bamFiles.add(((FileVirtualSplit) split).getPath());
 		}
+		Map<Path, List<Chunk>> fileToIntervalChunks = new LinkedHashMap<>();
 		for (Path bamFile : bamFiles) {
 			FileSystem fs = bamFile.getFileSystem(conf);
 
@@ -308,6 +312,7 @@ public class BAMInputFormat
 					.setUseAsyncIo(false);
 			SamReader samReader = readerFactory.open(NIOFileUtil.asPath(fs.makeQualified(bamFile).toUri()));
 			if (!samReader.hasIndex()) {
+				// TODO: change to an error rather than a warning
 				System.err.println("WARNING: no BAM index file found, splits will not be " +
 						"filtered, which may be very inefficient: " + bamFile);
 				return splits;
@@ -317,17 +322,9 @@ public class BAMInputFormat
 			SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(in, conf);
 			SAMSequenceDictionary dict = header.getSequenceDictionary();
 			BAMIndex idx = samReader.indexing().getIndex();
-
-			for (Locatable interval : intervals) {
-				int referenceIndex = dict.getSequenceIndex(interval.getContig());
-				int intervalStart = interval.getStart();
-				int intervalEnd = interval.getEnd();
-				BAMFileSpan sfs = idx.getSpanOverlapping(referenceIndex, intervalStart, intervalEnd);
-				chunks.addAll(sfs.getChunks());
-			}
+			QueryInterval[] queryIntervals = BAMRecordReader.prepareQueryIntervals(intervals, dict);
+			fileToIntervalChunks.put(bamFile, computeIntervalChunks(queryIntervals, idx));
 		}
-
-		chunks = Chunk.optimizeChunkList(chunks, 0); // use conservative value for min offset
 
 		// Use the chunks to filter the splits
 		List<InputSplit> filteredSplits = new ArrayList<InputSplit>();
@@ -335,28 +332,41 @@ public class BAMInputFormat
 			FileVirtualSplit virtualSplit = (FileVirtualSplit) split;
 			long splitStart = virtualSplit.getStartVirtualOffset();
 			long splitEnd = virtualSplit.getEndVirtualOffset();
-			// if any chunk overlaps with the split, keep the split, but adjust the start and
-			// end to the maximally overlapping portion for all chunks that overlap
-			long newStart = Long.MAX_VALUE;
-			long newEnd = Long.MIN_VALUE;
-			boolean overlaps = false;
+			List<Chunk> chunks = fileToIntervalChunks.get(virtualSplit.getPath());
+			List<Chunk> overlappingChunks = new ArrayList<>();
 			for (Chunk chunk : chunks) {
-				long chunkStart = chunk.getChunkStart();
-				long chunkEnd = chunk.getChunkEnd();
-				if (overlaps(splitStart, splitEnd, chunkStart, chunkEnd)) {
-					long overlapStart = Math.max(splitStart, chunkStart);
-					long overlapEnd = Math.min(splitEnd, chunkEnd);
-					newStart = Math.min(newStart, overlapStart);
-					newEnd = Math.max(newEnd, overlapEnd);
-					overlaps = true;
+				if (overlaps(splitStart, splitEnd, chunk.getChunkStart(), chunk.getChunkEnd())) {
+					overlappingChunks.add(chunk);
 				}
 			}
-			if (overlaps) {
-				filteredSplits.add(new FileVirtualSplit(virtualSplit.getPath(), newStart, newEnd,
-						virtualSplit.getLocations()));
+			if (!overlappingChunks.isEmpty()) {
+				long[] filePointers = new BAMFileSpan(overlappingChunks).toCoordinateArray();
+				filteredSplits.add(new FileVirtualSplit(virtualSplit.getPath(), splitStart, splitEnd,
+						virtualSplit.getLocations(), filePointers));
 			}
 		}
 		return filteredSplits;
+	}
+
+	private List<Chunk> computeIntervalChunks(QueryInterval[] intervals, BAMIndex fileIndex) {
+		// TODO: this is based on BAMFileReader#createIndexIterator - it is copied here since
+		// we only want to compute the file pointers once (rather than for every split)
+		// since it takes ~10s for a human exome
+
+		// Hit the index to determine the chunk boundaries for the required data.
+		final BAMFileSpan[] inputSpans = new BAMFileSpan[intervals.length];
+		for (int i = 0; i < intervals.length; ++i) {
+			final QueryInterval interval = intervals[i];
+			final BAMFileSpan span = fileIndex.getSpanOverlapping(interval.referenceIndex, interval.start, interval.end);
+			inputSpans[i] = span;
+		}
+		List<Chunk> chunks;
+		if (inputSpans.length > 0) {
+			chunks = BAMFileSpan.merge(inputSpans).getChunks();
+		} else {
+			chunks = null;
+		}
+		return chunks;
 	}
 
 	static boolean overlaps(long start, long end, long start2, long end2) {
