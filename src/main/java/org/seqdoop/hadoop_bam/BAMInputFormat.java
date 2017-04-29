@@ -255,10 +255,14 @@ public class BAMInputFormat
 				previousSplit.setEndVirtualOffset(alignedEnd);
 			} else {
 				previousSplit = new FileVirtualSplit(
-                                        path, alignedBeg, alignedEnd, fspl.getLocations());
+					path,
+					alignedBeg,
+					alignedEnd,
+					fspl.getLocations()
+				);
 				if(logger.isDebugEnabled()) {
 					final long byte_offset  = alignedBeg >>> 16;
-                                	final long record_offset = alignedBeg & 0xffff;
+					final long record_offset = alignedBeg & 0xffff;
 					logger.debug(
 						"Split {}: byte offset: {}, record offset: {}, virtual offset: {}",
 						i , byte_offset, record_offset, alignedBeg

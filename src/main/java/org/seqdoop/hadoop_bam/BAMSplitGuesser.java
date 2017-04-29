@@ -25,7 +25,6 @@ package org.seqdoop.hadoop_bam;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMUtils;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
@@ -208,22 +207,22 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 							continue;
 					}
 				}
-                                  catch (SAMFormatException     e) { continue; }
-				  catch (OutOfMemoryError       e) { continue; }
-				  catch (IllegalArgumentException e) { continue; }
-				  catch (RuntimeIOException     e) { continue; }
-				  // EOF can happen legitimately if the [beg,end) range is too
-				  // small to accommodate BLOCKS_NEEDED_FOR_GUESS and we get cut
-				  // off in the middle of a record. In that case, our stream
-				  // should have hit EOF as well. If we've then verified at least
-				  // something, go ahead with it and hope for the best.
-				  catch (FileTruncatedException e) {
-						if (!decodedAny && this.in.eof())
-							continue;
+				catch (SAMFormatException     e) { continue; }
+				catch (OutOfMemoryError       e) { continue; }
+				catch (IllegalArgumentException e) { continue; }
+				catch (RuntimeIOException     e) { continue; }
+				// EOF can happen legitimately if the [beg,end) range is too
+				// small to accommodate BLOCKS_NEEDED_FOR_GUESS and we get cut
+				// off in the middle of a record. In that case, our stream
+				// should have hit EOF as well. If we've then verified at least
+				// something, go ahead with it and hope for the best.
+				catch (FileTruncatedException e) {
+					if (!decodedAny && this.in.eof())
+						continue;
 				}
-				  catch (RuntimeEOFException    e) {
-						if (!decodedAny && this.in.eof())
-							continue;
+				catch (RuntimeEOFException    e) {
+					if (!decodedAny && this.in.eof())
+						continue;
 				}
 
 				return beg+cp0 << 16 | up0;
