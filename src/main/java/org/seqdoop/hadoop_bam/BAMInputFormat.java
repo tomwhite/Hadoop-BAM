@@ -156,19 +156,21 @@ public class BAMInputFormat
 	// Handles all the splits that share the Path of the one at index i,
 	// returning the next index to be used.
 	private int addIndexedSplits(
-			List<InputSplit> splits, int i, List<InputSplit> newSplits,
+			List<InputSplit> splits,
+			int i,
+			List<InputSplit> newSplits,
 			Configuration cfg)
 		throws IOException
 	{
-		final Path file = ((FileSplit)splits.get(i)).getPath();
+		final Path path = ((FileSplit)splits.get(i)).getPath();
 		List<InputSplit> potentialSplits = new ArrayList<>();
 
 		final SplittingBAMIndex idx = new SplittingBAMIndex(
-			file.getFileSystem(cfg).open(getIdxPath(file)));
+			path.getFileSystem(cfg).open(getIdxPath(path)));
 
 		int splitsEnd = splits.size();
 		for (int j = i; j < splitsEnd; ++j)
-			if (!file.equals(((FileSplit)splits.get(j)).getPath()))
+			if (!path.equals(((FileSplit)splits.get(j)).getPath()))
 				splitsEnd = j;
 
 		for (int j = i; j < splitsEnd; ++j) {
@@ -193,13 +195,18 @@ public class BAMInputFormat
 			}
 
 			if (blockStart == null || blockEnd == null) {
-				logger.warn("Index for {} was not good. Generating probabilistic splits", file);
-
+				logger.warn("Index for {} was not good. Generating probabilistic splits", path);
 				return addProbabilisticSplits(splits, i, newSplits, cfg);
 			}
 
-			potentialSplits.add(new FileVirtualSplit(
-						file, blockStart, blockEnd, fileSplit.getLocations()));
+			potentialSplits.add(
+				new FileVirtualSplit(
+					path,
+					blockStart,
+					blockEnd,
+					fileSplit.getLocations()
+				)
+			);
 		}
 
 		newSplits.addAll(potentialSplits);

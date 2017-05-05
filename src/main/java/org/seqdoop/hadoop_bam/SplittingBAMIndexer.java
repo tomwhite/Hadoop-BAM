@@ -76,7 +76,7 @@ public final class SplittingBAMIndexer {
 
 				"Writes, for each GRANULARITY alignments in a BAM file, its "+
 				"virtual file offset\nas a big-endian 64-bit integer into "+
-				"[filename].splitting-bai. The file is\nterminated by the BAM "+
+				"[filename].splitting-bai. The file is terminated by the BAM "+
 				"file's length, in the same format.");
 			return;
 		}
@@ -246,7 +246,9 @@ public final class SplittingBAMIndexer {
 	 * Perform indexing on the given BAM file, at the granularity level specified.
 	 */
 	public static void index(
-			final InputStream rawIn, final OutputStream out, final long inputSize,
+			final InputStream rawIn,
+			final OutputStream out,
+			final long inputSize,
 			final int granularity)
 		throws IOException
 	{
