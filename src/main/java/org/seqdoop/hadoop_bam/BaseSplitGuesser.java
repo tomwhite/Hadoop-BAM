@@ -22,8 +22,9 @@ class BaseSplitGuesser {
 
   protected static class PosSize {
     public int pos;
-    public int size;
-    public PosSize(int p, int s) { pos = p; size = s; }
+    public int uSize;
+    public int cSize;
+    public PosSize(int p, int us, int cs) { pos = p; uSize = us; cSize = cs; }
   }
 
   // Gives the compressed size on the side. Returns null if it doesn't find
@@ -94,7 +95,7 @@ class BaseSplitGuesser {
           p += bsize - xlen - 19 + 4;
           in.seek(p);
           IOUtils.readFully(in, buf.array(), 0, 4);
-          return new PosSize(p0, buf.getInt(0));
+          return new PosSize(p0, p + 4 - p0, buf.getInt(0));
         }
         // No luck: look for the next gzip block header. Start right after
         // where we last saw the identifiers, although we could probably

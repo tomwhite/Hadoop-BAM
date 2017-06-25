@@ -17,6 +17,7 @@ class BAMTestUtil {
       throws IOException {
     // file will be both queryname and coordinate sorted, so use one or the other
     SAMRecordSetBuilder samRecordSetBuilder = new SAMRecordSetBuilder(true, sortOrder);
+    samRecordSetBuilder.setRandomSeed(123);
     for (int i = 0; i < numPairs; i++) {
       int chr = 20;
       int start1 = (i + 1) * 1000;

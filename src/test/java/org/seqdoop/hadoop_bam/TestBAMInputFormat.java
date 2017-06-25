@@ -2,10 +2,10 @@ package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Interval;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -16,6 +16,10 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.junit.Test;
+import org.seqdoop.hadoop_bam.util.WrapSeekable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -53,6 +57,7 @@ public class TestBAMInputFormat {
     jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 40000);
     BAMInputFormat inputFormat = new BAMInputFormat();
     List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
     assertEquals(2, splits.size());
     List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
     List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
@@ -95,12 +100,23 @@ public class TestBAMInputFormat {
     jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 40000);
     BAMInputFormat inputFormat = new BAMInputFormat();
     List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
     assertEquals(2, splits.size());
     List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
     List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
     assertEquals(1629, split0Records.size());
     assertEquals(371, split1Records.size());
   }
+
+//  @Test
+//  public void testTrickySplit() throws Exception {
+//    Path path = new Path("file:///Users/ryan/c/hl/hadoop-bam/src/test/resources/1.bam");
+//    Configuration conf = new Configuration();
+//    SeekableStream ss = WrapSeekable.openPath(conf, path);
+//    BAMSplitGuesser guesser = new BAMSplitGuesser(ss, conf);
+//    guesser.fillBuffer(15071);
+//    assertEquals(65469, guesser.findNextBAMPos(0, 65469));
+//  }
 
   private List<SAMRecord> getSAMRecordsFromSplit(BAMInputFormat inputFormat,
       InputSplit split) throws Exception {

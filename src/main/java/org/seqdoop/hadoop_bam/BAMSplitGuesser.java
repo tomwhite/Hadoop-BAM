@@ -24,43 +24,39 @@ package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.SAMFileSpan;
-import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.seekablestream.ByteArraySeekableStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.util.Arrays;
-
+import htsjdk.samtools.seekablestream.SeekableStream;
+import htsjdk.samtools.util.BlockCompressedInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.GenericOptionsParser;
-
-import htsjdk.samtools.BAMRecordCodec;
-import htsjdk.samtools.FileTruncatedException;
-import htsjdk.samtools.SAMFormatException;
-import htsjdk.samtools.seekablestream.SeekableStream;
-import htsjdk.samtools.util.BlockCompressedInputStream;
-import htsjdk.samtools.util.RuntimeEOFException;
-import htsjdk.samtools.util.RuntimeIOException;
-
 import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
 import org.seqdoop.hadoop_bam.util.WrapSeekable;
+
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 
 /** A class for heuristically finding BAM record positions inside an area of
  * a BAM file.
  */
 public class BAMSplitGuesser extends BaseSplitGuesser {
 	private       SeekableStream             inFile;
-	private       BlockCompressedInputStream bgzf;
-	private final BAMRecordCodec             bamCodec;
+	public BlockCompressedInputStream bgzf;
+	private BAMPosGuesser posGuesser;
 	private final int                        referenceSequenceCount;
+
+	byte[] arr = new byte[MAX_BYTES_READ];
 
 	// We want to go through this many BGZF blocks fully, checking that they
 	// contain valid BAM records, when guessing a BAM record position.
-	private final static byte BLOCKS_NEEDED_FOR_GUESS = 3;
+	public final static byte BLOCKS_NEEDED_FOR_GUESS = 3;
 
 	// Since the max size of a BGZF block is 0xffff (64K), and we might be just
 	// one byte off from the start of the previous one, we need 0xfffe bytes for
@@ -68,8 +64,6 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 	// through.
 	private final static int MAX_BYTES_READ =
 		BLOCKS_NEEDED_FOR_GUESS * 0xffff + 0xfffe;
-
-	private final static int SHORTEST_POSSIBLE_BAM_RECORD = 4*9 + 1 + 1 + 1;
 
 	/** The stream must point to a valid BAM file, because the header is read
 	 * from it.
@@ -91,13 +85,44 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 			SeekableStream ss, InputStream headerStream, Configuration conf)
 		throws IOException
 	{
+		this(
+			ss,
+			SAMHeaderReader
+				.readSAMHeaderFrom(headerStream, conf)
+				.getSequenceDictionary().size()
+		);
+	}
+
+	public BAMSplitGuesser(SeekableStream ss,
+						   int referenceSequenceCount)
+		throws IOException
+	{
 		inFile = ss;
+		this.referenceSequenceCount = referenceSequenceCount;
+	}
 
-		referenceSequenceCount =
-			SAMHeaderReader.readSAMHeaderFrom(headerStream, conf)
-			.getSequenceDictionary().size();
+	public void fillBuffer(long beg, long end)
+		throws IOException {
 
-		bamCodec = new BAMRecordCodec(null, new LazyBAMRecordFactory());
+		this.inFile.seek(beg);
+
+		int totalRead = 0;
+		for (int left = Math.min((int)(end - beg), arr.length); left > 0;) {
+			final int r = inFile.read(arr, totalRead, left);
+			if (r < 0)
+				break;
+			totalRead += r;
+			left -= r;
+		}
+
+		arr = Arrays.copyOf(arr, totalRead);
+
+		in = new ByteArraySeekableStream(arr);
+
+		bgzf = new BlockCompressedInputStream(in);
+		bgzf.setCheckCrcs(true);
+
+		posGuesser = new BAMPosGuesser(bgzf, referenceSequenceCount);
 	}
 
 	/** Finds a virtual BAM record position in the physical position range
@@ -112,9 +137,17 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 		// on subsequent calls to this method.
 		if (beg == 0) {
 			this.inFile.seek(beg);
-			SamReader open = SamReaderFactory.makeDefault().setUseAsyncIo(false)
+			SamReader open =
+				SamReaderFactory
+					.makeDefault()
+					.setUseAsyncIo(false)
 					.open(SamInputResource.of(inFile));
-			SAMFileSpan span = open.indexing().getFilePointerSpanningReads();
+
+			SAMFileSpan span =
+				open
+					.indexing()
+					.getFilePointerSpanningReads();
+
 			if (span instanceof BAMFileSpan) {
 				return ((BAMFileSpan) span).getFirstOffset();
 			}
@@ -122,25 +155,8 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 
 		// Buffer what we need to go through.
 
-		byte[] arr = new byte[MAX_BYTES_READ];
-
 		this.inFile.seek(beg);
-		int totalRead = 0;
-		for (int left = Math.min((int)(end - beg), arr.length); left > 0;) {
-			final int r = inFile.read(arr, totalRead, left);
-			if (r < 0)
-				break;
-			totalRead += r;
-			left -= r;
-		}
-		arr = Arrays.copyOf(arr, totalRead);
-
-		this.in = new ByteArraySeekableStream(arr);
-
-		this.bgzf = new BlockCompressedInputStream(this.in);
-		this.bgzf.setCheckCrcs(true);
-
-		this.bamCodec.setInputStream(bgzf);
+		fillBuffer(beg, end);
 
 		final int firstBGZFEnd = Math.min((int)(end - beg), 0xffff);
 
@@ -162,175 +178,42 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 				continue;
 			}
 
-			// up: Uncompressed Position, indexes the data inside the BGZF block.
-			for (int up = 0;; ++up) {
-				final int up0 = up = guessNextBAMPos(cp0Virt, up, psz.size);
-
-				if (up0 < 0) {
-					// No BAM records found in the BGZF block: try the next BGZF
-					// block.
-					break;
-				}
-
-				// Verify that we can actually decode BLOCKS_NEEDED_FOR_GUESS worth
-				// of records starting at (cp0,up0).
-				bgzf.seek(cp0Virt | up0);
-				boolean decodedAny = false;
-				try {
-					byte b = 0;
-					int prevCP = cp0;
-					while (b < BLOCKS_NEEDED_FOR_GUESS)
-					{
-						SAMRecord record = bamCodec.decode();
-						if (record == null) {
-							break;
-						}
-						record.getCigar(); // force decoding of CIGAR
-						decodedAny = true;
-
-						final int cp2 = (int)(bgzf.getFilePointer() >>> 16);
-						if (cp2 != prevCP) {
-							// The compressed position changed so we must be in a new
-							// block.
-							assert cp2 > prevCP;
-							prevCP = cp2;
-							++b;
-						}
-					}
-
-					// Running out of records to verify is fine as long as we
-					// verified at least something. It should only happen if we
-					// couldn't fill the array.
-					if (b < BLOCKS_NEEDED_FOR_GUESS) {
-						assert arr.length < MAX_BYTES_READ;
-						if (!decodedAny)
-							continue;
-					}
-				}
-				catch (SAMFormatException     e) { continue; }
-				catch (OutOfMemoryError       e) { continue; }
-				catch (IllegalArgumentException e) { continue; }
-				catch (RuntimeIOException     e) { continue; }
-				// EOF can happen legitimately if the [beg,end) range is too
-				// small to accommodate BLOCKS_NEEDED_FOR_GUESS and we get cut
-				// off in the middle of a record. In that case, our stream
-				// should have hit EOF as well. If we've then verified at least
-				// something, go ahead with it and hope for the best.
-				catch (FileTruncatedException e) {
-					if (!decodedAny && this.in.eof())
-						continue;
-				}
-				catch (RuntimeEOFException    e) {
-					if (!decodedAny && this.in.eof())
-						continue;
-				}
-
-				return beg+cp0 << 16 | up0;
+			long nextBAMPos = findNextBAMPos(cp0, 0);
+			if (nextBAMPos < 0) {
+				return end;
 			}
+			return (beg << 16) + nextBAMPos;
 		}
 	}
 
-	private int guessNextBAMPos(long cpVirt, int up, int cSize) {
-		// What we're actually searching for is what's at offset [4], not [0]. So
-		// skip ahead by 4, thus ensuring that whenever we find a valid [0] it's
-		// at position up or greater.
-		up += 4;
+	public long findNextBAMPos(int cp0, int offset)
+		throws IOException {
 
 		try {
-			while (up + SHORTEST_POSSIBLE_BAM_RECORD - 4 < cSize) {
-				bgzf.seek(cpVirt | up);
-				IOUtils.readFully(bgzf, buf.array(), 0, 8);
+			long vPos = ((long) cp0 << 16) | offset;
+			int numTries = 65536;
+			boolean firstPass = true;
 
-				// If the first two checks fail we have what looks like a valid
-				// reference sequence ID. Assume we're at offset [4] or [24], i.e.
-				// the ID of either this read or its mate, respectively. So check
-				// the next integer ([8] or [28]) to make sure it's a 0-based
-				// leftmost coordinate.
-				final int id  = buf.getInt(0);
-				final int pos = buf.getInt(4);
-				if (id < -1 || id > referenceSequenceCount || pos < -1) {
-					++up;
+			// up: Uncompressed Position, indexes the data inside the BGZF block.
+			for (int i = 0; i < numTries; i++) {
+				if (firstPass) {
+					firstPass = false;
+					bgzf.seek(vPos);
+				} else {
+					bgzf.seek(vPos);
+					// Increment vPos, possibly over a block boundary
+					IOUtils.skipFully(bgzf, 1);
+					vPos = bgzf.getFilePointer();
+				}
+
+				if (!posGuesser.checkRecordStart(vPos)) {
 					continue;
 				}
 
-				// Okay, we could be at [4] or [24]. Assuming we're at [4], check
-				// that [24] is valid. Assume [4] because we should hit it first:
-				// the only time we expect to hit [24] is at the beginning of the
-				// split, as part of the first read we should skip.
-
-				bgzf.seek(cpVirt | up+20);
-				IOUtils.readFully(bgzf, buf.array(), 0, 8);
-
-				final int nid  = buf.getInt(0);
-				final int npos = buf.getInt(4);
-				if (nid < -1 || nid > referenceSequenceCount || npos < -1) {
-					++up;
-					continue;
-				}
-
-				// So far so good: [4] and [24] seem okay. Now do something a bit
-				// more involved: make sure that [36 + [12]&0xff - 1] == 0: that
-				// is, the name of the read should be null terminated.
-
-				// Move up to 0 just to make it less likely that we get confused
-				// with offsets. Remember where we should continue from if we
-				// reject this up.
-				final int nextUP = up + 1;
-				up -= 4;
-
-				bgzf.seek(cpVirt | up+12);
-				IOUtils.readFully(bgzf, buf.array(), 0, 4);
-
-				final int nameLength = buf.getInt(0) & 0xff;
-				if (nameLength < 1) {
-					// Names are null-terminated so length must be at least one
-					up = nextUP;
-					continue;
-				}
-
-				final int nullTerminator = up + 36 + nameLength-1;
-
-				if (nullTerminator >= cSize) {
-					// This BAM record can't fit here. But maybe there's another in
-					// the remaining space, so try again.
-					up = nextUP;
-					continue;
-				}
-
-				bgzf.seek(cpVirt | nullTerminator);
-				IOUtils.readFully(bgzf, buf.array(), 0, 1);
-
-				if (buf.get(0) != 0) {
-					up = nextUP;
-					continue;
-				}
-
-				// All of [4], [24], and [36 + [12]&0xff] look good. If [0] is also
-				// sensible, that's good enough for us. "Sensible" to us means the
-				// following:
-				//
-				// [0] >= 4*([16]&0xffff) + [20] + ([20]+1)/2 + 4*8 + ([12]&0xff)
-
-				// Note that [0] is "length of the _remainder_ of the alignment
-				// record", which is why this uses 4*8 instead of 4*9.
-				int zeroMin = 4*8 + nameLength;
-
-				bgzf.seek(cpVirt | up+16);
-				IOUtils.readFully(bgzf, buf.array(), 0, 8);
-
-				zeroMin += (buf.getInt(0) & 0xffff) * 4;
-				zeroMin += buf.getInt(4) + (buf.getInt(4)+1)/2;
-
-				bgzf.seek(cpVirt | up);
-				IOUtils.readFully(bgzf, buf.array(), 0, 4);
-
-				if (buf.getInt(0) < zeroMin) {
-					up = nextUP;
-					continue;
-				}
-				return up;
+				if (posGuesser.checkSucceedingRecords(vPos))
+					return vPos;
 			}
-		} catch (IOException e) {}
+		} catch (EOFException ignored) {}
 		return -1;
 	}
 
@@ -349,7 +232,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 		}
 
 		args = parser.getRemainingArgs();
-                final Configuration conf = parser.getConfiguration();
+		final Configuration conf = parser.getConfiguration();
 
 		long beg = 0;
 

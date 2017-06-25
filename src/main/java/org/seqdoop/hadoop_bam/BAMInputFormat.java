@@ -259,6 +259,8 @@ public class BAMInputFormat
 					throw new IOException("'" + path + "': "+
 						"no reads in first split: bad BAM file or tiny split size?");
 
+				logger.debug("Split {}: updating end to {}", i, alignedEnd);
+
 				previousSplit.setEndVirtualOffset(alignedEnd);
 			} else {
 				previousSplit = new FileVirtualSplit(

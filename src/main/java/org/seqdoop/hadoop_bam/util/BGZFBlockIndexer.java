@@ -45,8 +45,8 @@ public final class BGZFBlockIndexer {
 				"Usage: BGZFBlockIndexer GRANULARITY [BGZF files...]\n\n"+
 
 				"Writes, for each GRANULARITY gzip blocks in a BGZF file, its "+
-				"virtual file offset\nas a big-endian 48-bit integer into "+
-				"[filename].bgzfi. The file is terminated by\nthe BGZF file's "+
+				"virtual file offset as a big-endian 48-bit integer into "+
+				"[filename].bgzfi. The file is terminated by the BGZF file's "+
 				"length, in the same format.");
 			return;
 		}

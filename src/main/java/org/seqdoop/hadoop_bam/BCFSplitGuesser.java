@@ -175,7 +175,7 @@ public class BCFSplitGuesser extends BaseSplitGuesser {
 					// Guessed BGZF position incorrectly: try the next guess.
 					continue;
 				}
-				blockLen = psz.size;
+				blockLen = psz.uSize;
 			} else {
 				cp0 = 0; // Actually unused
 				cp0Virt = 0;
