@@ -1,7 +1,6 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMRecord;
-import htsjdk.samtools.BAMRecordCodec;
 import htsjdk.samtools.FileTruncatedException;
 import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SAMRecord;
@@ -21,6 +20,8 @@ import static org.seqdoop.hadoop_bam.BAMSplitGuesser.BLOCKS_NEEDED_FOR_GUESS;
 
 public class BAMPosGuesser {
 
+    public final int maximumRecordLength = 1000000000;
+    private final SeekableStream ss;
     private final SAMRecordFactory samRecordFactory = new LazyBAMRecordFactory();
     private final BinaryCodec binaryCodec = new BinaryCodec();
     private final BlockCompressedInputStream uncompressedBytes;
@@ -31,11 +32,15 @@ public class BAMPosGuesser {
             .allocate(36)
             .order(ByteOrder.LITTLE_ENDIAN);
 
-    public BAMPosGuesser(SeekableStream ss, int referenceSequenceCount) {
-        this(new BlockCompressedInputStream(ss), referenceSequenceCount);
+    public BAMPosGuesser(SeekableStream ss,
+                         int referenceSequenceCount) {
+        this(ss, new BlockCompressedInputStream(ss), referenceSequenceCount);
     }
 
-    public BAMPosGuesser(BlockCompressedInputStream uncompressedBytes, int referenceSequenceCount) {
+    public BAMPosGuesser(SeekableStream ss,
+                         BlockCompressedInputStream uncompressedBytes,
+                         int referenceSequenceCount) {
+        this.ss = ss;
         this.uncompressedBytes = uncompressedBytes;
         this.referenceSequenceCount = referenceSequenceCount;
         binaryCodec.setInputStream(uncompressedBytes);
@@ -149,12 +154,17 @@ public class BAMPosGuesser {
             SAMFormatException |
                 IllegalArgumentException |
                 OutOfMemoryError |
-                RuntimeIOException |
                 IndexOutOfBoundsException |
-                FileTruncatedException |
-                RuntimeEOFException e
+                FileTruncatedException e
             ) {
             return false;
+        }
+        catch (
+            RuntimeIOException |
+                RuntimeEOFException e
+            ) {
+            if (!decodedAny && this.ss.eof())
+                return false;
         }
 
         return true;
@@ -165,6 +175,23 @@ public class BAMPosGuesser {
      */
     static final int FIXED_BLOCK_SIZE = 8 * 4;
 
+    /**
+     * Simulate original/upstream validation of [[SAMRecord]]s downstream of a candidate "split guess":
+     *
+     *   - validate that its cigar has no invalid operation codes
+     *   - simulate reading ahead `recordLength` bytes, possibly triggering a [[RuntimeIOException]] if this would reach
+     *     past the end of the buffered [[MAX_BYTES_READ]] bytes of (compressed) data
+     *
+     * Unfortunately, the original algorithm relied on the available JVM heap size in a way that is hard to reproduce
+     * efficiently: bad split guesses' `recordLengths` were arbitrary integers, it would allocate a byte array of that
+     * size, and an [[OutOfMemoryError]] would be interpreted as ruling out that bad guess.
+     *
+     * Such allocations, and pathological other large ones that didn't quite cause [[OutOfMemoryError]]s, caused intense
+     * memory pressure on the JVMs doing the checking, dramatically slowing down evaluation of the guesser's accuracy.
+     *
+     * I've worked around this issue here by utilizing a configurable cap on records' `recordLength` fields, efficiently
+     * simulating a maximum allocation size, but with the downside that the original behavior is not exactly reproduced.
+     */
     public SAMRecord readLazyRecord() {
         int recordLength;
         try {
@@ -178,6 +205,11 @@ public class BAMPosGuesser {
             throw new SAMFormatException("Invalid record length: " + recordLength);
         }
 
+        // Simulate overly large allocations that would have previously caused [[OutOfMemoryError]]s
+        if (recordLength > maximumRecordLength) {
+            throw new IndexOutOfBoundsException();
+        }
+
         final int referenceID = this.binaryCodec.readInt();
         final int coordinate = this.binaryCodec.readInt() + 1;
         final short readNameLength = this.binaryCodec.readUByte();
@@ -189,16 +221,27 @@ public class BAMPosGuesser {
         final int mateReferenceID = this.binaryCodec.readInt();
         final int mateCoordinate = this.binaryCodec.readInt() + 1;
         final int insertSize = this.binaryCodec.readInt();
-        byte[] restOfRecord = new byte[readNameLength + 4 * cigarLen];
+        final int remainingToRead = recordLength - FIXED_BLOCK_SIZE;
+
+        // Only read enough data to validate the cigar operators
+        final int numToRead = readNameLength + 4 * cigarLen;
+        final byte[] restOfRecord = new byte[numToRead];
+
         this.binaryCodec.readBytes(restOfRecord);
         final BAMRecord ret = this.samRecordFactory.createBAMRecord(
             null, referenceID, coordinate, readNameLength, mappingQuality,
             bin, cigarLen, flags, readLen, mateReferenceID, mateCoordinate, insertSize, restOfRecord);
 
-        ret.getCigar();
+        // Simulate reading the full [[recordLength]] bytes of this "record", triggering a [[RuntimeIOException]] if
+        // that runs past the end of the buffered data.
+        try {
+            IOUtils.skipFully(uncompressedBytes, remainingToRead - numToRead);
+        } catch (IOException e) {
+            throw new RuntimeIOException("Read error", e);
+        }
 
-        restOfRecord = new byte[recordLength - readNameLength - 4 * cigarLen - FIXED_BLOCK_SIZE];
-        this.binaryCodec.readBytes(restOfRecord);
+        // If the above checks have not failed, validate the cigar.
+        ret.getCigar();
 
         return ret;
     }

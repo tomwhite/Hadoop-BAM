@@ -62,7 +62,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 	// one byte off from the start of the previous one, we need 0xfffe bytes for
 	// the start, and then 0xffff times the number of blocks we want to go
 	// through.
-	private final static int MAX_BYTES_READ =
+	public final static int MAX_BYTES_READ =
 		BLOCKS_NEEDED_FOR_GUESS * 0xffff + 0xfffe;
 
 	/** The stream must point to a valid BAM file, because the header is read
@@ -122,7 +122,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 		bgzf = new BlockCompressedInputStream(in);
 		bgzf.setCheckCrcs(true);
 
-		posGuesser = new BAMPosGuesser(bgzf, referenceSequenceCount);
+		posGuesser = new BAMPosGuesser(in, bgzf, referenceSequenceCount);
 	}
 
 	/** Finds a virtual BAM record position in the physical position range
