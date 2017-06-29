@@ -315,7 +315,7 @@ public class BAMInputFormat
 				}
 
 				try (FSDataInputStream in = fs.open(bamFile)) {
-					SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(in, conf);
+					SAMFileHeader header = SAMHeaderReader.readSAMHeaderFromStream(in, conf);
 					SAMSequenceDictionary dict = header.getSequenceDictionary();
 					BAMIndex idx = samReader.indexing().getIndex();
 					QueryInterval[] queryIntervals = prepareQueryIntervals(intervals, dict);

@@ -44,10 +44,10 @@ public class KeyIgnoringCRAMOutputFormat<K> extends CRAMOutputFormat<K> {
         this.header = SAMHeaderReader.readSAMHeaderFrom(path, conf);
     }
     public void readSAMHeaderFrom(InputStream in, Configuration conf) {
-        this.header = SAMHeaderReader.readSAMHeaderFrom(in, conf);
+        this.header = SAMHeaderReader.readSAMHeaderFromStream(in, conf);
     }
 
-    /** <code>setSAMHeader</code> or <code>readSAMHeaderFrom</code> must have
+    /** <code>setSAMHeader</code> or <code>readSAMHeaderFromStream</code> must have
      * been called first.
      */
     @Override public RecordWriter<K,SAMRecordWritable> getRecordWriter(

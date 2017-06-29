@@ -1,7 +1,6 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.*;
-import htsjdk.samtools.cram.CRAMException;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Rule;
 import org.junit.Test;
@@ -28,7 +27,7 @@ public class TestSAMHeaderReader {
         samReader.close();
 
         inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream("test.bam");
-        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFrom(inputStream, conf);
+        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFromStream(inputStream, conf);
         inputStream.close();
 
         assertEquals(samHeader.getSequenceDictionary().size(), sequenceCount);
@@ -42,7 +41,7 @@ public class TestSAMHeaderReader {
         final URI reference = ClassLoader.getSystemClassLoader().getResource("auxf.fa").toURI();
         conf.set(CRAMInputFormat.REFERENCE_SOURCE_PATH_PROPERTY, reference.toString());
 
-        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFrom(inputStream, conf);
+        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFromStream(inputStream, conf);
         inputStream.close();
 
         assertEquals(samHeader.getSequenceDictionary().size(), 1);
@@ -55,7 +54,7 @@ public class TestSAMHeaderReader {
 
         final Configuration conf = new Configuration();
         final InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream("test.cram");
-        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFrom(inputStream, conf);
+        SAMFileHeader samHeader = SAMHeaderReader.readSAMHeaderFromStream(inputStream, conf);
         inputStream.close();
 
         assertEquals(samHeader.getSequenceDictionary().size(), 1);

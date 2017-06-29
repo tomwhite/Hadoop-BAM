@@ -88,7 +88,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 		this(
 			ss,
 			SAMHeaderReader
-				.readSAMHeaderFrom(headerStream, conf)
+				.readSAMHeaderFromStream(headerStream, conf)
 				.getSequenceDictionary().size()
 		);
 	}
