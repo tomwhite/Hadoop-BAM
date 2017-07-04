@@ -192,7 +192,7 @@ public class BAMPosGuesser {
      * I've worked around this issue here by utilizing a configurable cap on records' `recordLength` fields, efficiently
      * simulating a maximum allocation size, but with the downside that the original behavior is not exactly reproduced.
      */
-    public SAMRecord readLazyRecord() {
+    public SAMRecord readLazyRecord() throws IOException {
         int recordLength;
         try {
             recordLength = this.binaryCodec.readInt();
@@ -228,17 +228,14 @@ public class BAMPosGuesser {
         final byte[] restOfRecord = new byte[numToRead];
 
         this.binaryCodec.readBytes(restOfRecord);
+
+        // Before any cigar-op validity-checks occur, simulate reading the full [[recordLength]] bytes of this "record",
+        // triggering a [[RuntimeIOException]] if that runs past the end of the buffered data.
+        IOUtils.skipFully(uncompressedBytes, remainingToRead - numToRead);
+
         final BAMRecord ret = this.samRecordFactory.createBAMRecord(
             null, referenceID, coordinate, readNameLength, mappingQuality,
             bin, cigarLen, flags, readLen, mateReferenceID, mateCoordinate, insertSize, restOfRecord);
-
-        // Simulate reading the full [[recordLength]] bytes of this "record", triggering a [[RuntimeIOException]] if
-        // that runs past the end of the buffered data.
-        try {
-            IOUtils.skipFully(uncompressedBytes, remainingToRead - numToRead);
-        } catch (IOException e) {
-            throw new RuntimeIOException("Read error", e);
-        }
 
         // If the above checks have not failed, validate the cigar.
         ret.getCigar();

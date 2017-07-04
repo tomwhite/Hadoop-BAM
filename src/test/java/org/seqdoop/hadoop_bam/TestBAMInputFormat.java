@@ -1,6 +1,7 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.SAMFileHeader;
+import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Interval;
@@ -23,6 +24,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 
 public class TestBAMInputFormat {
@@ -115,20 +117,28 @@ public class TestBAMInputFormat {
       Thread
           .currentThread()
           .getContextClassLoader()
-          .getResource("1.2203029-2211029.bam")
+          .getResource("1.2203053-2211029.bam")
           .getPath();
 
     completeSetup(null);
 
-    jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 680000);
+    jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 480000);
     BAMInputFormat inputFormat = new BAMInputFormat();
     List<InputSplit> splits = inputFormat.getSplits(jobContext);
 
     assertEquals(2, splits.size());
     List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
-    List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
-    assertEquals(5624, split0Records.size());
-    assertEquals(2376, split1Records.size());
+    assertEquals(3975, split0Records.size());
+
+    try {
+      getSAMRecordsFromSplit(inputFormat, splits.get(1));
+      fail("Expected split idx 1 to start with a bad read!");
+    } catch (SAMFormatException e) {
+      assertEquals(
+          "SAM validation error: ERROR: Record 1, Read name , MRNM should not be set for unpaired read.",
+          e.getMessage()
+      );
+    }
   }
 
   private List<SAMRecord> getSAMRecordsFromSplit(BAMInputFormat inputFormat,
