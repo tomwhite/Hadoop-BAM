@@ -87,7 +87,7 @@ public class BAMPosGuesser {
             }
 
             int cigarOpsLength = (buf.getInt(16) & 0xffff) * 4;
-            int seqLength = buf.getInt(4) + (buf.getInt(20)+1)/2;
+            int seqLength = buf.getInt(20) + (buf.getInt(20)+1)/2;
 
             // Pos 36 + nameLength - 1
             IOUtils.skipFully(uncompressedBytes, nameLength - 1);
