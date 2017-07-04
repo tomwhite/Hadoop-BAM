@@ -155,12 +155,12 @@ public class BAMPosGuesser {
                 IllegalArgumentException |
                 OutOfMemoryError |
                 IndexOutOfBoundsException |
-                FileTruncatedException e
+                RuntimeIOException e
             ) {
             return false;
         }
         catch (
-            RuntimeIOException |
+            FileTruncatedException |
                 RuntimeEOFException e
             ) {
             if (!decodedAny && this.ss.eof())

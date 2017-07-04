@@ -108,15 +108,28 @@ public class TestBAMInputFormat {
     assertEquals(371, split1Records.size());
   }
 
-//  @Test
-//  public void testTrickySplit() throws Exception {
-//    Path path = new Path("file:///Users/ryan/c/hl/hadoop-bam/src/test/resources/1.bam");
-//    Configuration conf = new Configuration();
-//    SeekableStream ss = WrapSeekable.openPath(conf, path);
-//    BAMSplitGuesser guesser = new BAMSplitGuesser(ss, conf);
-//    guesser.fillBuffer(15071);
-//    assertEquals(65469, guesser.findNextBAMPos(0, 65469));
-//  }
+  @Test
+  public void testWrongSplit() throws Exception {
+
+    input =
+      Thread
+          .currentThread()
+          .getContextClassLoader()
+          .getResource("1.2203029-2211029.bam")
+          .getPath();
+
+    completeSetup(null);
+
+    jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 680000);
+    BAMInputFormat inputFormat = new BAMInputFormat();
+    List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
+    assertEquals(2, splits.size());
+    List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
+    List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
+    assertEquals(5624, split0Records.size());
+    assertEquals(2376, split1Records.size());
+  }
 
   private List<SAMRecord> getSAMRecordsFromSplit(BAMInputFormat inputFormat,
       InputSplit split) throws Exception {
