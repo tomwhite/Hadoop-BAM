@@ -12,6 +12,7 @@ import htsjdk.samtools.util.RuntimeEOFException;
 import htsjdk.samtools.util.RuntimeIOException;
 import org.apache.hadoop.io.IOUtils;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -20,7 +21,12 @@ import static org.seqdoop.hadoop_bam.BAMSplitGuesser.BLOCKS_NEEDED_FOR_GUESS;
 
 public class BAMPosGuesser {
 
-    public final int maximumRecordLength = 1000000000;
+    // Change this value to simulate hadoop-bam throwing OOMs when attempting to allocate byte-arrays to store
+    // excessively large "records" (which are actually just random data from the inside of actual records).
+    //
+    // By default, this is effectively disabled, as it introduces too much randomness into simulating hadoop-bam's
+    // behavior.
+    public int maximumRecordLength = Integer.MAX_VALUE;
     private final SeekableStream ss;
     private final SAMRecordFactory samRecordFactory = new LazyBAMRecordFactory();
     private final BinaryCodec binaryCodec = new BinaryCodec();
@@ -205,7 +211,10 @@ public class BAMPosGuesser {
             throw new SAMFormatException("Invalid record length: " + recordLength);
         }
 
-        // Simulate overly large allocations that would have previously caused [[OutOfMemoryError]]s
+        // Simulate overly large allocations that would have previously caused [[OutOfMemoryError]]s.
+        // By default this is effectively disabled, since `maximumRecordLength`'s default value is Integer.MAX_VALUE.
+        // This means we are simulating hadoop-bam's behavior in the presence of heaps large enough that it loses the
+        // ability to catch false positions via OOMs.
         if (recordLength > maximumRecordLength) {
             throw new IndexOutOfBoundsException();
         }
@@ -231,7 +240,11 @@ public class BAMPosGuesser {
 
         // Before any cigar-op validity-checks occur, simulate reading the full [[recordLength]] bytes of this "record",
         // triggering a [[RuntimeIOException]] if that runs past the end of the buffered data.
-        IOUtils.skipFully(uncompressedBytes, remainingToRead - numToRead);
+        try {
+            IOUtils.skipFully(uncompressedBytes, remainingToRead - numToRead);
+        } catch (EOFException e) {
+            throw new RuntimeEOFException("Unexpected EOF while reading record", e);
+        }
 
         final BAMRecord ret = this.samRecordFactory.createBAMRecord(
             null, referenceID, coordinate, readNameLength, mappingQuality,
