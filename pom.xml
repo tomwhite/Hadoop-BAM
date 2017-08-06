@@ -32,9 +32,9 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.hammerlab</groupId>
     <artifactId>hadoop-bam</artifactId>
-    <version>7.9.0</version>
+    <version>7.9.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>Hadoop-BAM</name>
+    <name>hadoop-bam</name>
     <description>A Java library for the manipulation of files in common bioinformatics formats using the Hadoop MapReduce framework.</description>
     <url>http://sourceforge.net/projects/hadoop-bam/</url>
 
@@ -57,16 +57,16 @@
     <licenses>
         <license>
             <name>MIT-License</name>
-            <url>https://raw.githubusercontent.com/HadoopGenomics/Hadoop-BAM/master/LICENSE.txt</url>
+            <url>https://raw.githubusercontent.com/hammerlab/hadoop-bam/master/LICENSE.txt</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.com:HadoopGenomics/Hadoop-BAM.git</connection>
-        <developerConnection>scm:git:git@github.com:HadoopGenomics/Hadoop-BAM.git</developerConnection>
-        <url>scm:git:git@github.com:HadoopGenomics/Hadoop-BAM.git</url>
-        <tag>master</tag>
+        <connection>scm:git:git@github.com:hammerlab/hadoop-bam.git</connection>
+        <developerConnection>scm:git:git@github.com:hammerlab/hadoop-bam.git</developerConnection>
+        <url>scm:git:git@github.com:hammerlab/hadoop-bam.git</url>
+        <tag>7.9.0</tag>
     </scm>
     <developers>
         <developer>
@@ -84,7 +84,7 @@
     </developers>
     <issueManagement>
         <system>github</system>
-        <url>https://github.com/HadoopGenomics/Hadoop-BAM/issues</url>
+        <url>https://github.com/hammerlab/hadoop-bam/issues</url>
     </issueManagement>
 
     <build>
@@ -133,6 +133,17 @@
                     <mavenExecutorId>forked-path</mavenExecutorId>
                     <useReleaseProfile>false</useReleaseProfile>
                     <arguments>-Psonatype-oss-release</arguments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.7</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
             <plugin>
