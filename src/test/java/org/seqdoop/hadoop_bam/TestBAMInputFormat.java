@@ -1,11 +1,12 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.SAMFileHeader;
+import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Interval;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -16,9 +17,14 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.junit.Test;
+import org.seqdoop.hadoop_bam.util.WrapSeekable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 
 public class TestBAMInputFormat {
@@ -53,6 +59,7 @@ public class TestBAMInputFormat {
     jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 40000);
     BAMInputFormat inputFormat = new BAMInputFormat();
     List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
     assertEquals(2, splits.size());
     List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
     List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
@@ -95,11 +102,43 @@ public class TestBAMInputFormat {
     jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 40000);
     BAMInputFormat inputFormat = new BAMInputFormat();
     List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
     assertEquals(2, splits.size());
     List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
     List<SAMRecord> split1Records = getSAMRecordsFromSplit(inputFormat, splits.get(1));
     assertEquals(1629, split0Records.size());
     assertEquals(371, split1Records.size());
+  }
+
+  @Test
+  public void testWrongSplit() throws Exception {
+
+    input =
+      Thread
+          .currentThread()
+          .getContextClassLoader()
+          .getResource("1.2203053-2211029.bam")
+          .getPath();
+
+    completeSetup(null);
+
+    jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 480000);
+    BAMInputFormat inputFormat = new BAMInputFormat();
+    List<InputSplit> splits = inputFormat.getSplits(jobContext);
+
+    assertEquals(2, splits.size());
+    List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
+    assertEquals(3975, split0Records.size());
+
+    try {
+      getSAMRecordsFromSplit(inputFormat, splits.get(1));
+      fail("Expected split idx 1 to start with a bad read!");
+    } catch (SAMFormatException e) {
+      assertEquals(
+          "SAM validation error: ERROR: Record 1, Read name , MRNM should not be set for unpaired read.",
+          e.getMessage()
+      );
+    }
   }
 
   private List<SAMRecord> getSAMRecordsFromSplit(BAMInputFormat inputFormat,

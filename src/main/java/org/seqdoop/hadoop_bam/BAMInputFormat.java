@@ -31,28 +31,12 @@ import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.seqdoop.hadoop_bam.util.NIOFileUtil;
-import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
-import org.seqdoop.hadoop_bam.util.WrapSeekable;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
-import htsjdk.samtools.seekablestream.SeekableStream;
-
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -61,6 +45,20 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.seqdoop.hadoop_bam.util.NIOFileUtil;
+import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
+import org.seqdoop.hadoop_bam.util.WrapSeekable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** An {@link org.apache.hadoop.mapreduce.InputFormat} for BAM files. Values
  * are the individual records; see {@link BAMRecordReader} for the meaning of
@@ -69,8 +67,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 public class BAMInputFormat
 	extends FileInputFormat<LongWritable,SAMRecordWritable>
 {
-	// set this to true for debug output
-	public final static boolean DEBUG_BAM_SPLITTER = false;
+	private Logger logger = LoggerFactory.getLogger(BAMInputFormat.class);
 
 	/**
 	 * Filter by region, like <code>-L</code> in SAMtools. Takes a comma-separated
@@ -97,7 +94,7 @@ public class BAMInputFormat
 		if (intervalsProperty == null) {
 			return null;
 		}
-		List<Interval> intervals = new ArrayList<Interval>();
+		List<Interval> intervals = new ArrayList<>();
 		for (String s : intervalsProperty.split(",")) {
 			String[] parts = s.split(":|-");
 			Interval interval =
@@ -138,15 +135,13 @@ public class BAMInputFormat
 		// addIndexedSplits() requires the given splits to be sorted by file
 		// path, so do so. Although FileInputFormat.getSplits() does, at the time
 		// of writing this, generate them in that order, we shouldn't rely on it.
-		Collections.sort(splits, new Comparator<InputSplit>() {
-			public int compare(InputSplit a, InputSplit b) {
-				FileSplit fa = (FileSplit)a, fb = (FileSplit)b;
-				return fa.getPath().compareTo(fb.getPath());
-			}
+		splits.sort((a, b) -> {
+			FileSplit fa = (FileSplit) a, fb = (FileSplit) b;
+			return fa.getPath().compareTo(fb.getPath());
 		});
 
 		final List<InputSplit> newSplits =
-			new ArrayList<InputSplit>(splits.size());
+			new ArrayList<>(splits.size());
 
 		for (int i = 0; i < splits.size();) {
 			try {
@@ -161,19 +156,21 @@ public class BAMInputFormat
 	// Handles all the splits that share the Path of the one at index i,
 	// returning the next index to be used.
 	private int addIndexedSplits(
-			List<InputSplit> splits, int i, List<InputSplit> newSplits,
+			List<InputSplit> splits,
+			int i,
+			List<InputSplit> newSplits,
 			Configuration cfg)
 		throws IOException
 	{
-		final Path file = ((FileSplit)splits.get(i)).getPath();
-		List<InputSplit> potentialSplits = new ArrayList<InputSplit>();
+		final Path path = ((FileSplit)splits.get(i)).getPath();
+		List<InputSplit> potentialSplits = new ArrayList<>();
 
 		final SplittingBAMIndex idx = new SplittingBAMIndex(
-			file.getFileSystem(cfg).open(getIdxPath(file)));
+			path.getFileSystem(cfg).open(getIdxPath(path)));
 
 		int splitsEnd = splits.size();
 		for (int j = i; j < splitsEnd; ++j)
-			if (!file.equals(((FileSplit)splits.get(j)).getPath()))
+			if (!path.equals(((FileSplit)splits.get(j)).getPath()))
 				splitsEnd = j;
 
 		for (int j = i; j < splitsEnd; ++j) {
@@ -198,19 +195,21 @@ public class BAMInputFormat
 			}
 
 			if (blockStart == null || blockEnd == null) {
-				System.err.println("Warning: index for " + file.toString() +
-						" was not good. Generating probabilistic splits.");
-
+				logger.warn("Index for {} was not good. Generating probabilistic splits", path);
 				return addProbabilisticSplits(splits, i, newSplits, cfg);
 			}
 
-			potentialSplits.add(new FileVirtualSplit(
-						file, blockStart, blockEnd, fileSplit.getLocations()));
+			potentialSplits.add(
+				new FileVirtualSplit(
+					path,
+					blockStart,
+					blockEnd,
+					fileSplit.getLocations()
+				)
+			);
 		}
 
-		for (InputSplit s : potentialSplits) {
-			newSplits.add(s);
-		}
+		newSplits.addAll(potentialSplits);
 		return splitsEnd;
 	}
 
@@ -260,16 +259,23 @@ public class BAMInputFormat
 					throw new IOException("'" + path + "': "+
 						"no reads in first split: bad BAM file or tiny split size?");
 
+				logger.debug("Split {}: updating end to {}", i, alignedEnd);
+
 				previousSplit.setEndVirtualOffset(alignedEnd);
 			} else {
 				previousSplit = new FileVirtualSplit(
-                                        path, alignedBeg, alignedEnd, fspl.getLocations());
-				if(DEBUG_BAM_SPLITTER) {	
+					path,
+					alignedBeg,
+					alignedEnd,
+					fspl.getLocations()
+				);
+				if(logger.isDebugEnabled()) {
 					final long byte_offset  = alignedBeg >>> 16;
-                                	final long record_offset = alignedBeg & 0xffff;
-					System.err.println("XXX split " + i +
-						" byte offset: " + byte_offset + " record offset: " + 
-						record_offset + " virtual offset: " + alignedBeg);
+					final long record_offset = alignedBeg & 0xffff;
+					logger.debug(
+						"Split {}: byte offset: {}, record offset: {}, virtual offset: {}",
+						i , byte_offset, record_offset, alignedBeg
+					);
 				}
 				newSplits.add(previousSplit);
 			}
@@ -309,7 +315,7 @@ public class BAMInputFormat
 				}
 
 				try (FSDataInputStream in = fs.open(bamFile)) {
-					SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(in, conf);
+					SAMFileHeader header = SAMHeaderReader.readSAMHeaderFromStream(in, conf);
 					SAMSequenceDictionary dict = header.getSequenceDictionary();
 					BAMIndex idx = samReader.indexing().getIndex();
 					QueryInterval[] queryIntervals = prepareQueryIntervals(intervals, dict);

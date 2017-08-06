@@ -24,8 +24,6 @@ package org.seqdoop.hadoop_bam.util;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.nio.file.Paths;
 
 import htsjdk.samtools.cram.ref.ReferenceSource;
 import org.apache.hadoop.conf.Configuration;
@@ -49,13 +47,13 @@ public final class SAMHeaderReader {
 		throws IOException
 	{
 		InputStream i = path.getFileSystem(conf).open(path);
-		final SAMFileHeader h = readSAMHeaderFrom(i, conf);
+		final SAMFileHeader h = readSAMHeaderFromStream(i, conf);
 		i.close();
 		return h;
 	}
 
 	/** Does not close the stream. */
-	public static SAMFileHeader readSAMHeaderFrom(
+	public static SAMFileHeader readSAMHeaderFromStream(
 		final InputStream in, final Configuration conf)
 	{
 		final ValidationStringency

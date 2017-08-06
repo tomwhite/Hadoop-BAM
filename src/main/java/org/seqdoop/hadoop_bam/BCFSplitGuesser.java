@@ -175,7 +175,7 @@ public class BCFSplitGuesser extends BaseSplitGuesser {
 					// Guessed BGZF position incorrectly: try the next guess.
 					continue;
 				}
-				blockLen = psz.size;
+				blockLen = psz.uSize;
 			} else {
 				cp0 = 0; // Actually unused
 				cp0Virt = 0;
@@ -358,8 +358,9 @@ public class BCFSplitGuesser extends BaseSplitGuesser {
 		}
 		return -1;
 	}
+
 	private long getUInt(final int idx) {
-		return (long)buf.getInt(idx) & 0xffffffff;
+		return (long) buf.getInt(idx);
 	}
 	private short getUByte(final int idx) {
 		return (short)((short)buf.get(idx) & 0xff);

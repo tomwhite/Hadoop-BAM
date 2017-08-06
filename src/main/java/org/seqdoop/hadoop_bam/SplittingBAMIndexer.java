@@ -25,12 +25,13 @@ package org.seqdoop.hadoop_bam;
 import htsjdk.samtools.SAMFileSource;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMRecord;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
+import htsjdk.samtools.util.BlockCompressedInputStream;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -38,12 +39,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.LongBuffer;
 import java.util.Arrays;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-
-import htsjdk.samtools.util.BlockCompressedInputStream;
 
 /**
  * An indexing tool and API for BAM files, making them palatable to {@link
@@ -76,7 +71,7 @@ public final class SplittingBAMIndexer {
 
 				"Writes, for each GRANULARITY alignments in a BAM file, its "+
 				"virtual file offset\nas a big-endian 64-bit integer into "+
-				"[filename].splitting-bai. The file is\nterminated by the BAM "+
+				"[filename].splitting-bai. The file is terminated by the BAM "+
 				"file's length, in the same format.");
 			return;
 		}
@@ -93,18 +88,23 @@ public final class SplittingBAMIndexer {
 			return;
 		}
 
+		Configuration conf = new Configuration();
+
 		for (final String arg : Arrays.asList(args).subList(1, args.length)) {
-			final File f = new File(arg);
-			System.out.printf("Indexing %s...", f);
+			final Path f = new Path(arg);
 			try {
-				SplittingBAMIndexer.index(
-					new FileInputStream(f),
-					new BufferedOutputStream(new FileOutputStream(f + OUTPUT_FILE_EXTENSION)),
-					f.length(), granularity);
+				FileSystem fs = f.getFileSystem(conf);
+				System.out.printf("Indexing %s...", f);
+				index(
+					fs.open(f),
+					fs.create(f.suffix(OUTPUT_FILE_EXTENSION)),
+					fs.getFileStatus(f).getLen(),
+					granularity
+				);
 				System.out.println(" done.");
 			} catch (IOException e) {
-				System.out.println(" FAILED!");
 				e.printStackTrace();
+				System.exit(1);
 			}
 		}
 	}
@@ -127,11 +127,12 @@ public final class SplittingBAMIndexer {
 
 		final Path input = new Path(inputString);
 
-		SplittingBAMIndexer.index(
+		index(
 			fs.open(input),
 			fs.create(input.suffix(OUTPUT_FILE_EXTENSION)),
 			fs.getFileStatus(input).getLen(),
-			conf.getInt("granularity", DEFAULT_GRANULARITY));
+			conf.getInt("granularity", DEFAULT_GRANULARITY)
+		);
 	}
 
 	private final OutputStream out;
@@ -141,7 +142,7 @@ public final class SplittingBAMIndexer {
 	private long count;
 	private Method getFirstOffset;
 
-	private static final int PRINT_EVERY = 500*1024*1024;
+	private static final int PRINT_EVERY_N_BLOCKS = 500*1024*1024;
 
 	/**
 	 * Constructor that allows immediate specification of the granularity level
@@ -214,9 +215,7 @@ public final class SplittingBAMIndexer {
 		}
 		try {
 			return (Long) getFirstOffset.invoke(filePointer);
-		} catch (IllegalAccessException e) {
-			throw new IllegalStateException(e);
-		} catch (InvocationTargetException e) {
+		} catch (IllegalAccessException | InvocationTargetException e) {
 			throw new IllegalStateException(e);
 		}
 	}
@@ -246,7 +245,9 @@ public final class SplittingBAMIndexer {
 	 * Perform indexing on the given BAM file, at the granularity level specified.
 	 */
 	public static void index(
-			final InputStream rawIn, final OutputStream out, final long inputSize,
+			final InputStream rawIn,
+			final OutputStream out,
+			final long inputSize,
 			final int granularity)
 		throws IOException
 	{
@@ -263,7 +264,7 @@ public final class SplittingBAMIndexer {
 		lb.put(0, in.getFilePointer());
 		out.write(byteBuffer.array());
 
-		long prevPrint = in.getFilePointer() >> 16;
+		long prevPrintBlock = in.getFilePointer() >> 16;
 
 		for (int i = 0;;) {
 			final PtrSkipPair pair = readAlignment(byteBuffer, in);
@@ -275,10 +276,10 @@ public final class SplittingBAMIndexer {
 				lb.put(0, pair.ptr);
 				out.write(byteBuffer.array());
 
-				final long filePos = pair.ptr >> 16;
-				if (filePos - prevPrint >= PRINT_EVERY) {
-					System.out.print("-");
-					prevPrint = filePos;
+				final long curBlock = pair.ptr >> 16;
+				if (curBlock - prevPrintBlock >= PRINT_EVERY_N_BLOCKS) {
+					System.out.printf("Block: %d\n", curBlock);
+					prevPrintBlock = curBlock;
 				}
 			}
 			fullySkip(in, pair.skip);
