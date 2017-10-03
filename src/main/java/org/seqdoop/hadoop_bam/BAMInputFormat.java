@@ -44,7 +44,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.time.DurationFormatUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.seqdoop.hadoop_bam.util.IntervalUtil;
@@ -258,13 +257,11 @@ public class BAMInputFormat
 			}
 		}
 		long duration = startTime - System.nanoTime();
-		logger.info("Time to generate splits: {}",
-				DurationFormatUtils.formatDuration(duration / 1000000, "s.S 's'", false));
+		logger.info("Time to generate splits: {} ms", duration / 1000000L);
 		startTime = System.nanoTime();
 		List<InputSplit> inputSplits = filterByInterval(newSplits, cfg);
 		duration = startTime - System.nanoTime();
-		logger.info("Time to filter splits by interval: {}",
-				DurationFormatUtils.formatDuration(duration / 1000000, "s.S 's'", false));
+		logger.info("Time to filter splits by interval: {} ms", duration / 1000000L);
 		logger.info("Total number of splits: {}", inputSplits.size());
 		return inputSplits;
 	}
