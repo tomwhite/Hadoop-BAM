@@ -44,6 +44,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang.time.DurationFormatUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.seqdoop.hadoop_bam.util.IntervalUtil;
@@ -223,7 +224,7 @@ public class BAMInputFormat
 			List<InputSplit> splits, Configuration cfg)
 		throws IOException
 	{
-
+		long startTime = System.nanoTime();
 		final List<InputSplit> origSplits = removeIndexFiles(splits);
 
 		// Align the splits so that they don't cross blocks.
@@ -256,7 +257,16 @@ public class BAMInputFormat
 				}
 			}
 		}
-		return filterByInterval(newSplits, cfg);
+		long duration = startTime - System.nanoTime();
+		logger.info("Time to generate splits: {}",
+				DurationFormatUtils.formatDuration(duration / 1000000, "s.S 's'", false));
+		startTime = System.nanoTime();
+		List<InputSplit> inputSplits = filterByInterval(newSplits, cfg);
+		duration = startTime - System.nanoTime();
+		logger.info("Time to filter splits by interval: {}",
+				DurationFormatUtils.formatDuration(duration / 1000000, "s.S 's'", false));
+		logger.info("Total number of splits: {}", inputSplits.size());
+		return inputSplits;
 	}
 
 	// Handles all the splits that share the Path of the one at index i,
@@ -323,6 +333,7 @@ public class BAMInputFormat
                                  int i,
                                  List<InputSplit> newSplits,
                                  Configuration conf) throws IOException {
+                logger.info("Generating splits from .bai file");
                 final Path path = ((FileSplit)splits.get(i)).getPath();
                 FileSystem fs = path.getFileSystem(conf);
                 int splitsEnd = i;
@@ -471,6 +482,7 @@ public class BAMInputFormat
 			Configuration cfg)
 		throws IOException
 	{
+		logger.info("Generating probabilistic splits");
 		final Path path = ((FileSplit)splits.get(i)).getPath();
 		final SeekableStream sin =
 			WrapSeekable.openPath(path.getFileSystem(cfg), path);
