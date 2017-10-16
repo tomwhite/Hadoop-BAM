@@ -67,16 +67,28 @@ public class SAMFileMerger {
 
     Files.deleteIfExists(outputPath);
 
-    long headerLength;
-    try (final CountingOutputStream out =
-             new CountingOutputStream(Files.newOutputStream(outputPath))) {
-      if (header != null) {
+    Path headerPath = partPath.resolve("header");
+    Path terminatorPath = partPath.resolve("terminator");
+    long headerLength = 0;
+    if (header != null) {
+      try (final CountingOutputStream out =
+               new CountingOutputStream(Files.newOutputStream(headerPath))) {
         new SAMOutputPreparer().prepareForRecords(out, samOutputFormat, header); // write the header
+        headerLength = out.getCount();
       }
-      headerLength = out.getCount();
-      mergeInto(parts, out);
+    }
+    try (final OutputStream out = Files.newOutputStream(terminatorPath)) {
       writeTerminatorBlock(out, samOutputFormat);
     }
+
+    List<Path> allParts = new ArrayList<>();
+    allParts.add(headerPath);
+    allParts.addAll(parts);
+    allParts.add(terminatorPath);
+    try (final OutputStream out = Files.newOutputStream(outputPath)) {
+      mergeInto(allParts, out);
+    }
+
     long fileLength = Files.size(outputPath);
 
     final Path outputSplittingBaiPath = outputPath.resolveSibling(
