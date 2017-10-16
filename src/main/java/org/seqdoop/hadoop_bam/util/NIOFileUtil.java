@@ -16,8 +16,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.FileSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class NIOFileUtil {
+
+  private static final Logger logger = LoggerFactory.getLogger(NIOFileUtil.class);
+
   private NIOFileUtil() {
   }
 
@@ -99,11 +105,47 @@ public class NIOFileUtil {
   /**
    * Merge the given part files in order into an output stream.
    * @param parts the part files to merge
+   * @param outputPath the output path to write each file into, in order
+   * @throws IOException
+   */
+  static void mergeInto(List<Path> parts, Path outputPath, FileSystem filesystem)
+      throws IOException {
+    System.out.println("tw: " + parts);
+    parts.forEach(p -> System.out.println(p.toUri()));
+    try {
+      logger.warn("Attempting to use concat to merge files");
+      concat(parts, outputPath, filesystem);
+    } catch (UnsupportedOperationException e) {
+      logger.warn("Concat not supported, merging serially");
+      System.out.println("Concat not supported, merging serially");
+      try (final OutputStream out = Files.newOutputStream(outputPath)) {
+        for (final Path part : parts) {
+          Files.copy(part, out);
+        }
+      }
+      for (final Path part : parts) {
+        Files.delete(part);
+      }
+    }
+  }
+
+  static void concat(List<Path> parts, Path outputPath, FileSystem filesystem) throws IOException {
+    org.apache.hadoop.fs.Path[] fsParts = parts.stream()
+        .map(p -> new org.apache.hadoop.fs.Path(p.toUri()))
+        .collect(Collectors.toList())
+        .toArray(new org.apache.hadoop.fs.Path[parts.size()]);
+    filesystem.concat(new org.apache.hadoop.fs.Path(outputPath.toUri()), fsParts);
+  }
+
+  /**
+   * Merge the given part files in order into an output stream.
+   * @param parts the part files to merge
    * @param out the stream to write each file into, in order
    * @throws IOException
    */
   static void mergeInto(List<Path> parts, OutputStream out)
       throws IOException {
+    parts.forEach(p -> System.out.println(p.toUri()));
     for (final Path part : parts) {
       Files.copy(part, out);
     }

@@ -158,7 +158,7 @@ public class TestCRAMOutputFormat {
         final File outFile = File.createTempFile("testCRAMWriter", ".cram");
         outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.CRAM, samFileHeader);
+            SAMFormat.CRAM, samFileHeader, FileSystem.get(conf));
         final File containerStreamFile =
                 new File(new File(outputPath.toUri()), "part-m-00000");
         final int actualCount = getCRAMRecordCount(outFile);
@@ -174,14 +174,14 @@ public class TestCRAMOutputFormat {
         final File outFile = File.createTempFile("testCRAMWriter", ".cram");
         outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.CRAM, samFileHeader);
+            SAMFormat.CRAM, samFileHeader, FileSystem.get(conf));
 
         // now use the assembled output as m/r input
         outputPath = doMapReduce(outFile.getAbsolutePath());
 
         // merge the parts again
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.CRAM, samFileHeader);
+            SAMFormat.CRAM, samFileHeader, FileSystem.get(conf));
 
         // verify the final output
         final int actualCount = getCRAMRecordCount(outFile);

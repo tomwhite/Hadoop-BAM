@@ -153,7 +153,7 @@ public class TestBAMOutputFormat {
         final File outFile = File.createTempFile("testBAMWriter", ".bam");
         outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.BAM, samFileHeader);
+            SAMFormat.BAM, samFileHeader, FileSystem.get(conf));
         final int actualCount = getBAMRecordCount(outFile);
         assertEquals(expectedRecordCount, actualCount);
     }
@@ -167,7 +167,7 @@ public class TestBAMOutputFormat {
         final File outFile = File.createTempFile("testBAMWriter", ".bam");
         outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.BAM, new SAMRecordSetBuilder(true, SAMFileHeader.SortOrder.coordinate).getHeader());
+            SAMFormat.BAM, new SAMRecordSetBuilder(true, SAMFileHeader.SortOrder.coordinate).getHeader(), FileSystem.get(conf));
         final int actualCount = getBAMRecordCount(outFile);
         assertEquals(0, actualCount);
     }
@@ -198,7 +198,7 @@ public class TestBAMOutputFormat {
         //outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
             SAMFormat.BAM,
-            new SAMRecordSetBuilder(true, SAMFileHeader.SortOrder.coordinate).getHeader());
+            new SAMRecordSetBuilder(true, SAMFileHeader.SortOrder.coordinate).getHeader(), FileSystem.get(conf));
 
         final int actualCount = getBAMRecordCount(outFile);
         assertEquals(numPairs * 2 + 2, actualCount); // 2 unmapped reads
@@ -234,14 +234,14 @@ public class TestBAMOutputFormat {
         final File outFile = File.createTempFile("testBAMWriter", ".bam");
         outFile.deleteOnExit();
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.BAM, samFileHeader);
+            SAMFormat.BAM, samFileHeader, FileSystem.get(conf));
 
         // now use the assembled output as m/r input
         outputPath = doMapReduce(outFile.getAbsolutePath());
 
         // merge the parts again
         SAMFileMerger.mergeParts(outputPath.toUri().toString(), outFile.toURI().toString(),
-            SAMFormat.BAM, samFileHeader);
+            SAMFormat.BAM, samFileHeader, FileSystem.get(conf));
 
         // verify the final output
         final int actualCount = getBAMRecordCount(outFile);

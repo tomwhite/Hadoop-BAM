@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.hadoop.fs.FileSystem;
 import org.seqdoop.hadoop_bam.KeyIgnoringAnySAMOutputFormat;
 import org.seqdoop.hadoop_bam.SAMFormat;
 import org.seqdoop.hadoop_bam.SplittingBAMIndex;
@@ -44,7 +45,8 @@ public class SAMFileMerger {
    * @throws IOException
    */
   public static void mergeParts(final String partDirectory, final String outputFile,
-      final SAMFormat samOutputFormat, final SAMFileHeader header) throws IOException {
+      final SAMFormat samOutputFormat, final SAMFileHeader header, FileSystem
+      filesystem) throws IOException {
 
     // First, check for the _SUCCESS file.
     final Path partPath = asPath(partDirectory);
@@ -85,9 +87,7 @@ public class SAMFileMerger {
     allParts.add(headerPath);
     allParts.addAll(parts);
     allParts.add(terminatorPath);
-    try (final OutputStream out = Files.newOutputStream(outputPath)) {
-      mergeInto(allParts, out);
-    }
+    mergeInto(allParts, outputPath, filesystem);
 
     long fileLength = Files.size(outputPath);
 
