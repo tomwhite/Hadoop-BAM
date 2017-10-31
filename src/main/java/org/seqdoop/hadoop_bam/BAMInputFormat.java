@@ -595,7 +595,8 @@ public class BAMInputFormat
 			long splitStart = virtualSplit.getStartVirtualOffset();
 			long splitEnd = virtualSplit.getEndVirtualOffset();
 			BAMFileSpan splitSpan = new BAMFileSpan(new Chunk(splitStart, splitEnd));
-			BAMFileSpan span = fileToSpan.get(virtualSplit.getPath());
+			BAMFileSpan spanOrig = fileToSpan.get(virtualSplit.getPath());
+			BAMFileSpan span = spanOrig;
 			if (span == null) {
 				continue;
 			}
@@ -606,7 +607,7 @@ public class BAMInputFormat
 			if (!span.isEmpty()) {
 				System.out.println("tw: virtualSplit.getPath(): " + virtualSplit.getPath());
 				System.out.println("tw: splitSpan: " + splitSpan);
-				System.out.println("tw: span: " + span);
+				System.out.println("tw: span: " + spanOrig);
 				System.out.println("tw: span after removeContentsBefore: " + spanBefore);
 				System.out.println("tw: span after removeContentsAfter:" + spanAfter);
 			}
