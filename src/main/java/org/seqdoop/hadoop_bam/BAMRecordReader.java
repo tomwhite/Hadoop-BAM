@@ -177,6 +177,9 @@ public class BAMRecordReader
 				iterator = bamFileReader.createIndexIterator(queryIntervals, false, split.getIntervalFilePointers());
 
 			} catch (IllegalArgumentException e) {
+				System.out.println("tw: ");
+				System.out.println(split + " interval file " +
+						"pointers " + Arrays.toString(split.getIntervalFilePointers()));
 				e.printStackTrace();
 				System.out.println("tw: intervals " + intervals);
 				System.out.println("tw: queryIntervals " + Arrays.toString(queryIntervals));
