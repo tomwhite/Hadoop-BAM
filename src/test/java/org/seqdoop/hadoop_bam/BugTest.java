@@ -7,6 +7,7 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.Interval;
 import java.io.File;
@@ -48,7 +49,8 @@ public class BugTest {
         new Interval("chr17", 16058316, 16058755)
     );
 
-    SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault();
+    SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault()
+        .validationStringency(ValidationStringency.LENIENT);
     File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
 
