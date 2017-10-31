@@ -1,11 +1,13 @@
 package org.seqdoop.hadoop_bam;
 
+import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.Interval;
 import java.io.File;
 import java.util.Arrays;
@@ -56,6 +58,19 @@ public class BugTest {
     SAMRecordIterator query = samReader.query(queryIntervals, false);
     SAMRecord next = query.next();
     System.out.println(next);
+
+    SamReader.PrimitiveSamReader primitiveSamReader =
+        ((SamReader.PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
+    BAMFileReader bamFileReader = (BAMFileReader) primitiveSamReader;
+
+    long[] fps = new long[] {608786084564831L, 608790229485907L, 608906404801351L,
+        608906404804816L};
+
+    CloseableIterator<SAMRecord> iterator = bamFileReader.createIndexIterator
+        (queryIntervals,
+        false, fps);
+    SAMRecord next2 = iterator.next();
+    System.out.println(next2);
   }
 
 }
