@@ -596,15 +596,21 @@ public class BAMInputFormat
 			long splitEnd = virtualSplit.getEndVirtualOffset();
 			BAMFileSpan splitSpan = new BAMFileSpan(new Chunk(splitStart, splitEnd));
 			BAMFileSpan span = fileToSpan.get(virtualSplit.getPath());
-			System.out.println("tw: splitSpan: " + splitSpan);
-			System.out.println("tw: span: " + span);
 			if (span == null) {
 				continue;
 			}
-			span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
-			System.out.println("tw: span after removeContentsBefore: " + span);
-			span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
-			System.out.println("tw: span after removeContentsBefore:" + span);
+			BAMFileSpan spanBefore = (BAMFileSpan) span.removeContentsBefore(splitSpan);
+			span = spanBefore;
+			BAMFileSpan spanAfter = (BAMFileSpan) span.removeContentsAfter(splitSpan);
+			span = spanAfter;
+			if (!span.isEmpty()) {
+				System.out.println("tw: virtualSplit.getPath(): " + virtualSplit.getPath());
+				System.out.println("tw: splitSpan: " + splitSpan);
+				System.out.println("tw: span: " + span);
+				System.out.println("tw: span after removeContentsBefore: " + spanBefore);
+				System.out.println("tw: span after removeContentsAfter:" + spanAfter);
+			}
+
 			if (!span.getChunks().isEmpty()) {
 				filteredSplits.add(new FileVirtualSplit(virtualSplit.getPath(), splitStart, splitEnd,
 						virtualSplit.getLocations(), span.toCoordinateArray()));
