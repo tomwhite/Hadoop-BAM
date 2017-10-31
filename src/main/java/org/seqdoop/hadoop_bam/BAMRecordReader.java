@@ -35,6 +35,7 @@ import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.Interval;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
@@ -178,7 +179,7 @@ public class BAMRecordReader
 			} catch (IllegalArgumentException e) {
 				e.printStackTrace();
 				System.out.println("tw: intervals " + intervals);
-				System.out.println("tw: queryIntervals " + queryIntervals);
+				System.out.println("tw: queryIntervals " + Arrays.toString(queryIntervals));
 			}
 		} else if (boundedTraversal && split.getIntervalFilePointers() == null) {
 			// return unmapped reads
