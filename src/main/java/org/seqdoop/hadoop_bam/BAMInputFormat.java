@@ -601,7 +601,8 @@ public class BAMInputFormat
 			if (span == null) {
 				continue;
 			}
-			BAMFileSpan spanBefore = (BAMFileSpan) removeContentsBefore(splitSpan); // use local one
+			BAMFileSpan spanBefore = (BAMFileSpan) removeContentsBefore(span, splitSpan); //
+			// use local one
 			span = spanBefore;
 			BAMFileSpan spanAfter = (BAMFileSpan) span.removeContentsAfter(splitSpan);
 			span = spanAfter;
@@ -656,9 +657,10 @@ public class BAMInputFormat
 	 * @param fileSpan The filespan before which to eliminate.
 	 * @return A new BAMFileSpan which contains the portion of the chunk list after the given chunk.
 	 */
-	private SAMFileSpan removeContentsBefore(final SAMFileSpan fileSpan) {
+	private SAMFileSpan removeContentsBefore(final SAMFileSpan span, final SAMFileSpan
+			fileSpan) {
 		if(fileSpan == null)
-			return ((BAMFileSpan)fileSpan).clone();
+			return ((BAMFileSpan)span).clone();
 
 		if(!(fileSpan instanceof BAMFileSpan))
 			throw new SAMException("Unable to compare ");
@@ -666,7 +668,7 @@ public class BAMInputFormat
 		final BAMFileSpan bamFileSpan = (BAMFileSpan)fileSpan;
 
 		if(bamFileSpan.isEmpty())
-			return ((BAMFileSpan)fileSpan).clone();
+			return ((BAMFileSpan)span).clone();
 
 		validateSorted(bamFileSpan);
 
