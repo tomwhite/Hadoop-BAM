@@ -596,11 +596,15 @@ public class BAMInputFormat
 			long splitEnd = virtualSplit.getEndVirtualOffset();
 			BAMFileSpan splitSpan = new BAMFileSpan(new Chunk(splitStart, splitEnd));
 			BAMFileSpan span = fileToSpan.get(virtualSplit.getPath());
+			System.out.println("tw: splitSpan: " + splitSpan);
+			System.out.println("tw: span: " + span);
 			if (span == null) {
 				continue;
 			}
 			span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
+			System.out.println("tw: span after removeContentsBefore: " + span);
 			span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
+			System.out.println("tw: span after removeContentsBefore:" + span);
 			if (!span.getChunks().isEmpty()) {
 				filteredSplits.add(new FileVirtualSplit(virtualSplit.getPath(), splitStart, splitEnd,
 						virtualSplit.getLocations(), span.toCoordinateArray()));
