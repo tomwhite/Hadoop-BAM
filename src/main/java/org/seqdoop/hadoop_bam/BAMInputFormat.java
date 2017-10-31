@@ -30,6 +30,7 @@ import htsjdk.samtools.Chunk;
 import htsjdk.samtools.LinearBAMIndex;
 import htsjdk.samtools.LinearIndex;
 import htsjdk.samtools.QueryInterval;
+import htsjdk.samtools.SAMException;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMSequenceDictionary;
@@ -600,7 +601,7 @@ public class BAMInputFormat
 			if (span == null) {
 				continue;
 			}
-			BAMFileSpan spanBefore = (BAMFileSpan) span.removeContentsBefore(splitSpan);
+			BAMFileSpan spanBefore = (BAMFileSpan) removeContentsBefore(splitSpan); // use local one
 			span = spanBefore;
 			BAMFileSpan spanAfter = (BAMFileSpan) span.removeContentsAfter(splitSpan);
 			span = spanAfter;
@@ -646,6 +647,45 @@ public class BAMInputFormat
 				"pointers " + Arrays.toString(((FileVirtualSplit) split).getIntervalFilePointers())));
 
 		return filteredSplits;
+	}
+
+	/**
+	 * Creates a new file span by removing all chunks before the given file span starts.
+	 * If a chunk in the chunk list starts before and ends after the given
+	 * chunk, the first portion of the chunk will be deleted.
+	 * @param fileSpan The filespan before which to eliminate.
+	 * @return A new BAMFileSpan which contains the portion of the chunk list after the given chunk.
+	 */
+	private SAMFileSpan removeContentsBefore(final SAMFileSpan fileSpan) {
+		if(fileSpan == null)
+			return ((BAMFileSpan)fileSpan).clone();
+
+		if(!(fileSpan instanceof BAMFileSpan))
+			throw new SAMException("Unable to compare ");
+
+		final BAMFileSpan bamFileSpan = (BAMFileSpan)fileSpan;
+
+		if(bamFileSpan.isEmpty())
+			return ((BAMFileSpan)fileSpan).clone();
+
+		validateSorted(bamFileSpan);
+
+		final List<Chunk> trimmedChunks = new ArrayList<>();
+		final long chunkStart = bamFileSpan.getChunks().get(0).getChunkStart();
+		for(final Chunk chunkToTrim: bamFileSpan.getChunks()) {
+			if(chunkToTrim.getChunkEnd() > chunkStart) {
+				trimmedChunks.add(chunkToTrim.clone());
+			}
+		}
+		return new BAMFileSpan(trimmedChunks);
+	}
+
+	private void validateSorted(BAMFileSpan bamFileSpan) {
+		List<Chunk> chunks = bamFileSpan.getChunks();
+		for(int i = 1; i < chunks.size(); i++) {
+			if(chunks.get(i).getChunkStart() < chunks.get(i-1).getChunkEnd())
+				throw new SAMException(String.format("Chunk list is unsorted; chunk %s is before chunk %s",chunks.get(i-1),chunks.get(i)));
+		}
 	}
 
 	/**
