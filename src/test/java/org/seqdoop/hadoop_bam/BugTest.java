@@ -63,8 +63,7 @@ public class BugTest {
         ((SamReader.PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
     BAMFileReader bamFileReader = (BAMFileReader) primitiveSamReader;
 
-    long[] fps = new long[] {608786084564831L, 608790229485907L, 608906404801351L,
-        608906404804816L};
+    long[] fps = new long[] {635519759417674L, 635521956422799L, 635743212618345L, 635746550876978L, 636544324476233L, 636587065413965L, 636765036877584L, 636765036917023L, 637044077127896L, 637044077135323L, 637102369721539L, 637107968978500L, 637118925170700L, 637118925171269L};
 
     CloseableIterator<SAMRecord> iterator = bamFileReader.createIndexIterator
         (queryIntervals,
