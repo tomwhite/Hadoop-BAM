@@ -172,7 +172,14 @@ public class BAMRecordReader
 			// return reads for intervals
 			List<Interval> intervals = BAMInputFormat.getIntervals(conf);
 			QueryInterval[] queryIntervals = BAMInputFormat.prepareQueryIntervals(intervals, header.getSequenceDictionary());
-			iterator = bamFileReader.createIndexIterator(queryIntervals, false, split.getIntervalFilePointers());
+			try {
+				iterator = bamFileReader.createIndexIterator(queryIntervals, false, split.getIntervalFilePointers());
+
+			} catch (IllegalArgumentException e) {
+				e.printStackTrace();
+				System.out.println("tw: intervals " + intervals);
+				System.out.println("tw: queryIntervals " + queryIntervals);
+			}
 		} else if (boundedTraversal && split.getIntervalFilePointers() == null) {
 			// return unmapped reads
 			iterator = bamFileReader.queryUnmapped();

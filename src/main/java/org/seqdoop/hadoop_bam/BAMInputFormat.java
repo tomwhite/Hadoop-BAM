@@ -38,6 +38,7 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -629,6 +630,9 @@ public class BAMInputFormat
 				}
 			}
 		}
+
+		filteredSplits.forEach(split -> System.out.println(split + " interval file " +
+				"pointers " + Arrays.toString(((FileVirtualSplit) split).getIntervalFilePointers())));
 
 		return filteredSplits;
 	}
