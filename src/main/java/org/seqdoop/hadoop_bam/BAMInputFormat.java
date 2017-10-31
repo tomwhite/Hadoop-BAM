@@ -674,7 +674,7 @@ public class BAMInputFormat
 
 		final List<Chunk> trimmedChunks = new ArrayList<>();
 		final long chunkStart = bamFileSpan.getChunks().get(0).getChunkStart();
-		for(final Chunk chunkToTrim: bamFileSpan.getChunks()) {
+		for(final Chunk chunkToTrim: ((BAMFileSpan)span).getChunks()) {
 			if(chunkToTrim.getChunkEnd() > chunkStart) {
 				trimmedChunks.add(chunkToTrim.clone());
 			}
