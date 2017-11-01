@@ -258,6 +258,10 @@ public class BAMInputFormat
 				}
 			}
 		}
+		System.out.println("Unfiltered splits");
+		newSplits.forEach(split -> System.out.println(split + " interval file " +
+				"pointers " + Arrays.toString(((FileVirtualSplit) split).getIntervalFilePointers())));
+		System.out.println("Unfiltered splits end");
 		return filterByInterval(newSplits, cfg);
 	}
 
