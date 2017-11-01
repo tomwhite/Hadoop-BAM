@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
 
+import static org.junit.Assert.fail;
+
 public class BugTest {
 
   @Test
@@ -85,6 +87,7 @@ public class BugTest {
       System.out.println(next3);
     } catch (Exception e) {
       e.printStackTrace();
+      fail();
     }
   }
 
@@ -98,8 +101,15 @@ public class BugTest {
 
     bamCodec.setInputStream(bgzf);
 
-    SAMRecord record = bamCodec.decode();
-    record.getCigar(); // force decoding of CIGAR
+    try {
+      SAMRecord record = bamCodec.decode();
+      record.getCigar(); // force decoding of CIGAR
+      record.getCigarString();
+      record.isValid(true);
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail();
+    }
   }
 
 }
