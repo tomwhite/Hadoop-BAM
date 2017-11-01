@@ -117,6 +117,7 @@ public class BugTest {
       //record.isValid(false);
       record.getCigar(); // force decoding of CIGAR
       record.getCigarString();
+      System.out.println(record.getSAMString());
     } catch (Exception e) {
       e.printStackTrace();
       fail();
