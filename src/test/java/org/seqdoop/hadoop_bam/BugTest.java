@@ -109,6 +109,20 @@ public class BugTest {
 
     bamCodec.setInputStream(bgzf);
 
+    System.out.println("Decode first");
+    try {
+      SAMRecord record = bamCodec.decode();
+      record.setValidationStringency(ValidationStringency.SILENT);
+      record.setHeader(header);
+      //record.isValid(false);
+      record.getCigar(); // force decoding of CIGAR
+      record.getCigarString();
+    } catch (Exception e) {
+      e.printStackTrace();
+      fail();
+    }
+
+    System.out.println("Decode second");
     try {
       SAMRecord record = bamCodec.decode();
       record.setValidationStringency(ValidationStringency.SILENT);
