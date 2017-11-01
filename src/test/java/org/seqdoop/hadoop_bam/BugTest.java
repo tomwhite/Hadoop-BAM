@@ -4,6 +4,7 @@ import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
 import htsjdk.samtools.BAMRecordCodec;
 import htsjdk.samtools.Chunk;
+import htsjdk.samtools.DefaultSAMRecordFactory;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
@@ -101,7 +102,8 @@ public class BugTest {
         .validationStringency(ValidationStringency.SILENT);
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
 
-    BAMRecordCodec bamCodec = new BAMRecordCodec(null, new LazyBAMRecordFactory());
+    BAMRecordCodec bamCodec = new BAMRecordCodec(null, DefaultSAMRecordFactory
+        .getInstance());
     BlockCompressedInputStream bgzf = new BlockCompressedInputStream(bam);
     bgzf.seek(635519759417674L);
     bgzf.setCheckCrcs(true);
