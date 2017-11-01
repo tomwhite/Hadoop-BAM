@@ -24,7 +24,7 @@ import static org.junit.Assert.fail;
 
 public class BugTest {
 
-  //@Test
+  @Test
   public void test1() {
     List<Interval> intervals = Arrays.asList(
         new Interval("chr15", 68820524, 68821028),
