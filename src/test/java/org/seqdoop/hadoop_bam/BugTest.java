@@ -79,9 +79,13 @@ public class BugTest {
 //    System.out.println(next2);
 
     BAMFileSpan splitSpan = new BAMFileSpan(new Chunk(fps[0], fps[1]));
-    CloseableIterator<SAMRecord> iterator = bamFileReader.getIterator(splitSpan);
-    SAMRecord next3 = iterator.next();
-    System.out.println(next3);
+    try {
+      CloseableIterator<SAMRecord> iterator = bamFileReader.getIterator(splitSpan);
+      SAMRecord next3 = iterator.next();
+      System.out.println(next3);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
   @Test
