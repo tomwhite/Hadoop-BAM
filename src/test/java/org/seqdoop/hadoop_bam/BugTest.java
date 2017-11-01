@@ -57,7 +57,7 @@ public class BugTest {
     );
 
     SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault()
-        .validationStringency(ValidationStringency.LENIENT);
+        .validationStringency(ValidationStringency.SILENT);
     File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
 
@@ -98,7 +98,7 @@ public class BugTest {
     File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
 
     SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault()
-        .validationStringency(ValidationStringency.LENIENT);
+        .validationStringency(ValidationStringency.SILENT);
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
 
     BAMRecordCodec bamCodec = new BAMRecordCodec(null, new LazyBAMRecordFactory());
@@ -110,7 +110,7 @@ public class BugTest {
 
     try {
       SAMRecord record = bamCodec.decode();
-      record.setValidationStringency(ValidationStringency.LENIENT);
+      record.setValidationStringency(ValidationStringency.SILENT);
       record.setHeader(header);
       record.isValid(false);
       record.getCigar(); // force decoding of CIGAR
