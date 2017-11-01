@@ -94,6 +94,11 @@ public class BugTest {
   @Test
   public void testStream() throws IOException {
     File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
+
+    SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault()
+        .validationStringency(ValidationStringency.LENIENT);
+    SAMFileHeader header = samReaderFactory.getFileHeader(bam);
+
     BAMRecordCodec bamCodec = new BAMRecordCodec(null, new LazyBAMRecordFactory());
     BlockCompressedInputStream bgzf = new BlockCompressedInputStream(bam);
     bgzf.seek(635519759417674L);
@@ -103,9 +108,10 @@ public class BugTest {
 
     try {
       SAMRecord record = bamCodec.decode();
+      record.setHeader(header);
+      record.isValid(true);
       record.getCigar(); // force decoding of CIGAR
       record.getCigarString();
-      //record.isValid(true);
     } catch (Exception e) {
       e.printStackTrace();
       fail();
