@@ -59,9 +59,9 @@ public class BugTest {
     QueryInterval[] queryIntervals = BAMInputFormat.prepareQueryIntervals(intervals, header.getSequenceDictionary());
 
     SamReader samReader = samReaderFactory.open(bam);
-    SAMRecordIterator query = samReader.query(queryIntervals, false);
-    SAMRecord next = query.next();
-    System.out.println(next);
+//    SAMRecordIterator query = samReader.query(queryIntervals, false);
+//    SAMRecord next = query.next();
+//    System.out.println(next);
 
     SamReader.PrimitiveSamReader primitiveSamReader =
         ((SamReader.PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
