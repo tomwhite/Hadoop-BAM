@@ -102,8 +102,7 @@ public class BugTest {
         .validationStringency(ValidationStringency.SILENT);
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
 
-    BAMRecordCodec bamCodec = new BAMRecordCodec(null, DefaultSAMRecordFactory
-        .getInstance());
+    BAMRecordCodec bamCodec = new BAMRecordCodec(header, DefaultSAMRecordFactory.getInstance());
     BlockCompressedInputStream bgzf = new BlockCompressedInputStream(bam);
     bgzf.seek(635519759417674L);
     bgzf.setCheckCrcs(true);
