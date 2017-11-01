@@ -58,6 +58,7 @@ public class BugTest {
     );
 
     SamReaderFactory samReaderFactory = SamReaderFactory.makeDefault()
+        .enable(SamReaderFactory.Option.EAGERLY_DECODE)
         .validationStringency(ValidationStringency.SILENT);
     File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
     SAMFileHeader header = samReaderFactory.getFileHeader(bam);
