@@ -179,6 +179,9 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 				if ((cp0Virt | up0) == 635519759417674L) {
 					System.out.println("tw: hello");
 				}
+				if ((beg+cp0 << 16 | up0) == 635519759417674L) {
+					System.out.println("tw: hello2");
+				}
 				boolean decodedAny = false;
 				try {
 					byte b = 0;
