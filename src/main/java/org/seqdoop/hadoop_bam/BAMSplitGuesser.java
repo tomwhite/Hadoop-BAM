@@ -176,6 +176,9 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 				// Verify that we can actually decode BLOCKS_NEEDED_FOR_GUESS worth
 				// of records starting at (cp0,up0).
 				bgzf.seek(cp0Virt | up0);
+				if ((cp0Virt | up0) == 635519759417674L) {
+					System.out.println("tw: hello");
+				}
 				boolean decodedAny = false;
 				try {
 					byte b = 0;
