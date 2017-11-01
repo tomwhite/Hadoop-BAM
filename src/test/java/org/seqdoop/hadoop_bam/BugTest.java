@@ -2,6 +2,7 @@ package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMFileReader;
 import htsjdk.samtools.BAMFileSpan;
+import htsjdk.samtools.BAMRecordCodec;
 import htsjdk.samtools.Chunk;
 import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMFileHeader;
@@ -10,9 +11,11 @@ import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
+import htsjdk.samtools.util.BlockCompressedInputStream;
 import htsjdk.samtools.util.CloseableIterator;
 import htsjdk.samtools.util.Interval;
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
@@ -79,6 +82,20 @@ public class BugTest {
     CloseableIterator<SAMRecord> iterator = bamFileReader.getIterator(splitSpan);
     SAMRecord next3 = iterator.next();
     System.out.println(next3);
+  }
+
+  @Test
+  public void testStream() throws IOException {
+    File bam = new File("/home/tom/tmp/gatkspark_refname/gatkspark_refname.bam");
+    BAMRecordCodec bamCodec = new BAMRecordCodec(null, new LazyBAMRecordFactory());
+    BlockCompressedInputStream bgzf = new BlockCompressedInputStream(bam);
+    bgzf.seek(635519759417674L);
+    bgzf.setCheckCrcs(true);
+
+    bamCodec.setInputStream(bgzf);
+
+    SAMRecord record = bamCodec.decode();
+    record.getCigar(); // force decoding of CIGAR
   }
 
 }
