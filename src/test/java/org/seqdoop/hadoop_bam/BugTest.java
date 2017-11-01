@@ -113,7 +113,7 @@ public class BugTest {
       SAMRecord record = bamCodec.decode();
       record.setValidationStringency(ValidationStringency.SILENT);
       record.setHeader(header);
-      record.isValid(false);
+      //record.isValid(false);
       record.getCigar(); // force decoding of CIGAR
       record.getCigarString();
     } catch (Exception e) {
