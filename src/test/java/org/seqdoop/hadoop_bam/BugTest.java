@@ -80,6 +80,8 @@ public class BugTest {
 //    SAMRecord next2 = iterator.next();
 //    System.out.println(next2);
 
+    System.out.println(bamFileReader.getValidationStringency());
+
     BAMFileSpan splitSpan = new BAMFileSpan(new Chunk(fps[0], fps[1]));
     try {
       CloseableIterator<SAMRecord> iterator = bamFileReader.getIterator(splitSpan);
@@ -108,8 +110,9 @@ public class BugTest {
 
     try {
       SAMRecord record = bamCodec.decode();
+      record.setValidationStringency(ValidationStringency.LENIENT);
       record.setHeader(header);
-      record.isValid(true);
+      record.isValid(false);
       record.getCigar(); // force decoding of CIGAR
       record.getCigarString();
     } catch (Exception e) {
