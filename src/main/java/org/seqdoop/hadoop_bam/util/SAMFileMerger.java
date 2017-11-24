@@ -101,7 +101,7 @@ public class SAMFileMerger {
       throw e;
     }
 
-    deleteRecursive(partPath);
+    //deleteRecursive(partPath);
   }
 
   //Terminate the aggregated output stream with an appropriate SAMOutputFormat-dependent terminator block
