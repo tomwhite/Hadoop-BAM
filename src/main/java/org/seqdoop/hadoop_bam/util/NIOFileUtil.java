@@ -134,7 +134,13 @@ public class NIOFileUtil {
         .map(p -> new org.apache.hadoop.fs.Path(p.toUri()))
         .collect(Collectors.toList())
         .toArray(new org.apache.hadoop.fs.Path[parts.size()]);
-    filesystem.concat(new org.apache.hadoop.fs.Path(outputPath.toUri()), fsParts);
+    org.apache.hadoop.fs.Path target = new org.apache.hadoop.fs.Path(outputPath.toUri());
+    filesystem.create(target); // target must already exist for concat
+    try {
+      filesystem.concat(target, fsParts);
+    } catch (UnsupportedOperationException e) {
+      filesystem.delete(target, false); // TODO: delete for other exceptions?
+    }
   }
 
   /**
