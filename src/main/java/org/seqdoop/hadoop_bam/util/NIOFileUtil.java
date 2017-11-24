@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,7 +136,7 @@ public class NIOFileUtil {
         .collect(Collectors.toList())
         .toArray(new org.apache.hadoop.fs.Path[parts.size()]);
     org.apache.hadoop.fs.Path target = new org.apache.hadoop.fs.Path(outputPath.toUri());
-    filesystem.create(target); // target must already exist for concat
+    filesystem.create(target).close();// target must already exist for concat
     try {
       filesystem.concat(target, fsParts);
     } catch (UnsupportedOperationException e) {
