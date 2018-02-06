@@ -23,6 +23,7 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMFileSpan;
+import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileSpan;
 import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SamInputResource;
@@ -51,6 +52,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 	public BlockCompressedInputStream bgzf;
 	private BAMPosGuesser posGuesser;
 	private final int                        referenceSequenceCount;
+	private SAMFileHeader header;
 
 	byte[] arr = new byte[MAX_BYTES_READ];
 
@@ -89,16 +91,19 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 			ss,
 			SAMHeaderReader
 				.readSAMHeaderFromStream(headerStream, conf)
-				.getSequenceDictionary().size()
+				.getSequenceDictionary().size(),
+			SAMHeaderReader
+					.readSAMHeaderFromStream(headerStream, conf)
 		);
 	}
 
 	public BAMSplitGuesser(SeekableStream ss,
-						   int referenceSequenceCount)
+						   int referenceSequenceCount, SAMFileHeader header)
 		throws IOException
 	{
 		inFile = ss;
 		this.referenceSequenceCount = referenceSequenceCount;
+		this.header = header;
 	}
 
 	public void fillBuffer(long beg, long end)
@@ -122,7 +127,7 @@ public class BAMSplitGuesser extends BaseSplitGuesser {
 		bgzf = new BlockCompressedInputStream(in);
 		bgzf.setCheckCrcs(true);
 
-		posGuesser = new BAMPosGuesser(in, bgzf, referenceSequenceCount);
+		posGuesser = new BAMPosGuesser(in, bgzf, referenceSequenceCount, header);
 	}
 
 	/** Finds a virtual BAM record position in the physical position range

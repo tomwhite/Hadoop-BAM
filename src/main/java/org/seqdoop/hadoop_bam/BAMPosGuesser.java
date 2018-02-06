@@ -2,9 +2,11 @@ package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMRecord;
 import htsjdk.samtools.FileTruncatedException;
+import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFormatException;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordFactory;
+import htsjdk.samtools.SAMRecordHelper;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BinaryCodec;
 import htsjdk.samtools.util.BlockCompressedInputStream;
@@ -32,6 +34,7 @@ public class BAMPosGuesser {
     private final BinaryCodec binaryCodec = new BinaryCodec();
     private final BlockCompressedInputStream uncompressedBytes;
     private final int                        referenceSequenceCount;
+    private final SAMFileHeader header;
 
     private final ByteBuffer buf =
         ByteBuffer
@@ -39,17 +42,20 @@ public class BAMPosGuesser {
             .order(ByteOrder.LITTLE_ENDIAN);
 
     public BAMPosGuesser(SeekableStream ss,
-                         int referenceSequenceCount) {
-        this(ss, new BlockCompressedInputStream(ss), referenceSequenceCount);
+                         int referenceSequenceCount,
+                         SAMFileHeader header) {
+        this(ss, new BlockCompressedInputStream(ss), referenceSequenceCount, header);
     }
 
     public BAMPosGuesser(SeekableStream ss,
                          BlockCompressedInputStream uncompressedBytes,
-                         int referenceSequenceCount) {
+                         int referenceSequenceCount,
+                         SAMFileHeader header) {
         this.ss = ss;
         this.uncompressedBytes = uncompressedBytes;
         this.referenceSequenceCount = referenceSequenceCount;
         binaryCodec.setInputStream(uncompressedBytes);
+        this.header = header;
     }
 
     public boolean checkRecordStart(long vPos) {
@@ -135,7 +141,8 @@ public class BAMPosGuesser {
                     break;
                 }
 
-                record.getCigar(); // force decoding of CIGAR
+                record.setHeaderStrict(header);
+                SAMRecordHelper.eagerDecode(record); // force decoding of fields
                 decodedAny = true;
 
                 final long cp2 = (uncompressedBytes.getFilePointer() >>> 16);
