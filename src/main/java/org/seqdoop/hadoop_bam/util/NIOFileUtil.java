@@ -3,6 +3,7 @@ package org.seqdoop.hadoop_bam.util;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.FileSystem;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -18,6 +19,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class NIOFileUtil {
+
+  private static FileSystem S3;
+  static {
+    try {
+      S3 = FileSystems.newFileSystem(URI.create("s3:///"), new HashMap<>(), Thread.currentThread().getContextClassLoader());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
   private NIOFileUtil() {
   }
 
@@ -30,6 +41,9 @@ public class NIOFileUtil {
    */
   public static Path asPath(URI uri) {
     try {
+      if (uri.getScheme().equals(S3.provider().getScheme())) {
+        return S3.provider().getPath(uri);
+      }
       return Paths.get(uri);
     } catch (FileSystemNotFoundException e) {
       ClassLoader cl = Thread.currentThread().getContextClassLoader();
