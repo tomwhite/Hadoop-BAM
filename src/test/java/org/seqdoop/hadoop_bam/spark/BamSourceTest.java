@@ -100,7 +100,7 @@ public class BamSourceTest {
 
   }
 
-  private static int getBAMRecordCount(final File bamFile) throws IOException {
+  static int getBAMRecordCount(final File bamFile) throws IOException {
     final SamReader bamReader = SamReaderFactory.makeDefault()
         .open(SamInputResource.of(bamFile));
     final Iterator<SAMRecord> it = bamReader.iterator();
