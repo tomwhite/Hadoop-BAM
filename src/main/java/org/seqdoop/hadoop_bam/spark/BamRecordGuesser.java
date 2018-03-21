@@ -81,6 +81,35 @@ public class BamRecordGuesser {
 
     final int remainingBytes = buf.getInt(0);
 
+    // BAM format
+    //
+    //   0                   1                   2                   3                   4                   5                   6                   7
+    //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  | block_size    | refID         | pos           | bin_mq_nl     | flag_nc       | l_seq         | next_refID    | next_pos      | t_len         |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  |                               |
+    //  : read_name (l_read_name bytes) :
+    //  |                               |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  |                               |
+    //  : cigar (n_cigar_op bytes)      :
+    //  |                               |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  |                               |
+    //  : seq ((l_seq + 1)/2 bytes)     :
+    //  |                               |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  |                               |
+    //  : qual (l_seq bytes)            :
+    //  |                               |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //  |                               |
+    //  : auxilary data                 :
+    //  |                               |
+    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //
+
     // If the first two checks fail we have what looks like a valid
     // reference sequence ID. Assume we're at offset [4] or [24], i.e.
     // the ID of either this read or its mate, respectively. So check
