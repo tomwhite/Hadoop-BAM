@@ -34,7 +34,10 @@ public class VcfSourceTest {
     String path = "file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/test.vcf";
 
     // find all the variants
-    JavaRDD<VariantContext> variants = new VcfSource().getVariants(jsc, path, splitSize);
+    JavaRDD<VariantContext> variants = VcfDatasetFactory.makeDefault(jsc)
+        .splitSize(splitSize)
+        .read(path)
+        .getVariantsRdd();
 
     int expectedCount = getVariantCount(new File(path.replace("file://", "")));
     Assert.assertEquals(expectedCount, variants.count());
@@ -47,7 +50,10 @@ public class VcfSourceTest {
     String path = "file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/HiSeq.10000.vcf.bgzf.gz";
 
     // find all the variants
-    JavaRDD<VariantContext> variants = new VcfSource().getVariants(jsc, path, splitSize);
+    JavaRDD<VariantContext> variants = VcfDatasetFactory.makeDefault(jsc)
+        .splitSize(splitSize)
+        .read(path)
+        .getVariantsRdd();
 
     Assert.assertTrue(variants.getNumPartitions() > 1);
 
