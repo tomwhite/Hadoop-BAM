@@ -21,6 +21,8 @@ interface FileSystemWrapper extends Serializable {
 
   long getFileLength(Configuration conf, String path) throws IOException;
 
+  boolean isDirectory(Configuration conf, String path) throws IOException;
+
   List<String> listDirectory(Configuration conf, String path) throws IOException;
 
   void concat(Configuration conf, List<String> parts, String path) throws IOException;

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -35,7 +36,7 @@ import scala.Tuple2;
 /**
  * Load reads from a BAM file on Spark.
  *
- * @see BamSource
+ * @see BamSink
  */
 class BamSource implements Serializable {
 
@@ -58,10 +59,22 @@ class BamSource implements Serializable {
   }
 
   public SAMFileHeader getFileHeader(JavaSparkContext jsc, String path) throws IOException {
-    // TODO: read first header if path is a directory
     // TODO: support header merging
-    try (InputStream headerIn = fileSystemWrapper.open(jsc.hadoopConfiguration(), path)) {
-      return SAMHeaderReader.readSAMHeaderFrom(headerIn, jsc.hadoopConfiguration());
+    Configuration conf = jsc.hadoopConfiguration();
+    String firstBamPath;
+    if (fileSystemWrapper.isDirectory(conf, path)) {
+      Optional<String> firstPath = fileSystemWrapper.listDirectory(conf, path).stream()
+          .filter(f -> !(f.startsWith(".") || f.startsWith("_")))
+          .findFirst();
+      if (!firstPath.isPresent()) {
+        throw new IllegalArgumentException("No files found in " + path);
+      }
+      firstBamPath = firstPath.get();
+    } else {
+      firstBamPath = path;
+    }
+    try (InputStream headerIn = fileSystemWrapper.open(conf, firstBamPath)) {
+      return SAMHeaderReader.readSAMHeaderFrom(headerIn, conf);
     }
   }
 

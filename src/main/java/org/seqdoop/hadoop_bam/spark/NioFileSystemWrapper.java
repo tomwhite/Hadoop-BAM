@@ -5,7 +5,6 @@ import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.seqdoop.hadoop_bam.util.NIOFileUtil;
@@ -30,6 +29,11 @@ class NioFileSystemWrapper implements FileSystemWrapper {
   @Override
   public long getFileLength(Configuration conf, String path) throws IOException {
     return Files.size(NIOFileUtil.asPath(path));
+  }
+
+  @Override
+  public boolean isDirectory(Configuration conf, String path) throws IOException {
+    return Files.isDirectory(NIOFileUtil.asPath(path));
   }
 
   @Override

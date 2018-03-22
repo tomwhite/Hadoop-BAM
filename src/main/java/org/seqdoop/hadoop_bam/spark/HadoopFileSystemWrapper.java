@@ -42,6 +42,13 @@ class HadoopFileSystemWrapper implements FileSystemWrapper {
   }
 
   @Override
+  public boolean isDirectory(Configuration conf, String path) throws IOException {
+    Path p = new Path(path);
+    FileSystem fileSystem = p.getFileSystem(conf);
+    return fileSystem.isDirectory(p);
+  }
+
+  @Override
   public List<String> listDirectory(Configuration conf, String path) throws IOException {
     Path p = new Path(path);
     FileSystem fileSystem = p.getFileSystem(conf);

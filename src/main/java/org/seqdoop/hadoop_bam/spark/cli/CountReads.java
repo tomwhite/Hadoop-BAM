@@ -6,7 +6,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.seqdoop.hadoop_bam.AnySAMInputFormat;
 import org.seqdoop.hadoop_bam.SAMRecordWritable;
-import org.seqdoop.hadoop_bam.spark.BamSource;
+import org.seqdoop.hadoop_bam.spark.SamDatasetFactory;
 import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
 
 public class CountReads {
@@ -23,14 +23,23 @@ public class CountReads {
   public static long countReadsNio(String path, String sparkMaster, int splitSize) throws IOException {
     try (JavaSparkContext jsc = new JavaSparkContext(sparkMaster, "CountReadsNio")) {
       jsc.hadoopConfiguration().set(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY, ValidationStringency.SILENT.name());
-      return new BamSource(false).getReads(jsc, path, splitSize).count();
+      return SamDatasetFactory.makeDefault(jsc)
+          .splitSize(splitSize)
+          .useNio(true)
+          .read(path)
+          .getReadsRdd()
+          .count();
     }
   }
 
   public static long countReads(String path, String sparkMaster, int splitSize) throws IOException {
     try (JavaSparkContext jsc = new JavaSparkContext(sparkMaster, "CountReads")) {
       jsc.hadoopConfiguration().set(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY, ValidationStringency.SILENT.name());
-      return new BamSource().getReads(jsc, path, splitSize).count();
+      return SamDatasetFactory.makeDefault(jsc)
+          .splitSize(splitSize)
+          .read(path)
+          .getReadsRdd()
+          .count();
     }
   }
 
