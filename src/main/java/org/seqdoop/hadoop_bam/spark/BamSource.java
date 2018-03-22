@@ -57,6 +57,14 @@ public class BamSource implements Serializable {
     this.fileSystemWrapper = useNio ? new NioFileSystemWrapper() : new HadoopFileSystemWrapper();
   }
 
+  public SAMFileHeader getFileHeader(JavaSparkContext jsc, String path) throws IOException {
+    // TODO: read first header if path is a directory
+    // TODO: support header merging
+    try (InputStream headerIn = fileSystemWrapper.open(jsc.hadoopConfiguration(), path)) {
+      return SAMHeaderReader.readSAMHeaderFrom(headerIn, jsc.hadoopConfiguration());
+    }
+  }
+
   /**
    * @return an RDD for the first read starting in each partition, or null for partitions
    * that don't have a read starting in them.

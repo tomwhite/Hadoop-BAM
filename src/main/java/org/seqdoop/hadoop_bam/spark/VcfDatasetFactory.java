@@ -26,8 +26,8 @@ public class VcfDatasetFactory {
 
   public VcfDataset read(String path) throws IOException {
     VcfSource vcfSource = new VcfSource();
-    JavaRDD<VariantContext> variants = vcfSource.getVariants(sparkContext, path, splitSize);
     VCFHeader header = vcfSource.getFileHeader(sparkContext, path);
+    JavaRDD<VariantContext> variants = vcfSource.getVariants(sparkContext, path, splitSize);
     return new VcfDataset(header, variants);
   }
 
