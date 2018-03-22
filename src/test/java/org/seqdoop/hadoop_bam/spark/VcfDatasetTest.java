@@ -1,7 +1,6 @@
 package org.seqdoop.hadoop_bam.spark;
 
 import com.google.common.io.Files;
-import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedInputStream;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
@@ -20,7 +19,6 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.seqdoop.hadoop_bam.util.VCFHeaderReader;
 
 @RunWith(JUnitParamsRunner.class)
 public class VcfDatasetTest {
@@ -51,22 +49,17 @@ public class VcfDatasetTest {
     VcfDatasetFactory vcfDatasetFactory = VcfDatasetFactory.makeDefault(jsc)
         .splitSize(splitSize);
 
-    JavaRDD<VariantContext> variants = vcfDatasetFactory
-        .read(inputPath)
-        .getVariantsRdd();
+    VcfDataset vcfDataset = vcfDatasetFactory.read(inputPath);
 
     int expectedCount = getVariantCount(new File(inputPath.replace("file://", "")));
-    Assert.assertEquals(expectedCount, variants.count());
+    Assert.assertEquals(expectedCount, vcfDataset.getVariantsRdd().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
     outputFile.delete();
     String outputPath = outputFile.toURI().toString();
 
-    FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
-    try (SeekableStream headerIn = fileSystemWrapper.open(jsc.hadoopConfiguration(), inputPath)) {
-      vcfDatasetFactory
-          .write(new VcfDataset(VCFHeaderReader.readHeaderFrom(headerIn), variants), outputPath);
-    }
+    vcfDatasetFactory.write(vcfDataset, outputPath);
+
     if (outputExtension.endsWith(".gz") || outputExtension.endsWith(".bgz")) {
       Assert.assertTrue("block compressed", isBlockCompressed(outputFile));
     } else {

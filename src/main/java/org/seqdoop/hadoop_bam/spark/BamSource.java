@@ -37,7 +37,7 @@ import scala.Tuple2;
  *
  * @see BamSource
  */
-public class BamSource implements Serializable {
+class BamSource implements Serializable {
 
   private static final int MAX_READ_SIZE = 10_000_000;
 

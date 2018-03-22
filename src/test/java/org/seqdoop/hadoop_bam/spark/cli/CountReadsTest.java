@@ -9,14 +9,12 @@ import java.io.IOException;
 import java.util.Iterator;
 import org.junit.Assert;
 import org.junit.Test;
-import org.seqdoop.hadoop_bam.spark.cli.CountReads;
 
 public class CountReadsTest {
   @Test
   public void testCountReads() throws IOException {
-    int splitSize = 1 * 128 * 1024;
-
     String path = "file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam";
+    int splitSize = 128 * 1024;
 
     int expectedCount = getBAMRecordCount(new File(path.replace("file://", "")));
     Assert.assertEquals(expectedCount, CountReads.countReads(path, "local", splitSize));
@@ -24,9 +22,8 @@ public class CountReadsTest {
 
   @Test
   public void testCountReadsNio() throws IOException {
-    int splitSize = 1 * 128 * 1024;
-
     String path = "file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam";
+    int splitSize = 128 * 1024;
 
     int expectedCount = getBAMRecordCount(new File(path.replace("file://", "")));
     Assert.assertEquals(expectedCount, CountReads.countReadsNio(path, "local", splitSize));
@@ -34,9 +31,8 @@ public class CountReadsTest {
 
   @Test
   public void testCountReadsLegacy() throws IOException {
-    int splitSize = 1 * 128 * 1024;
-
     String path = "file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam";
+    int splitSize = 128 * 1024;
 
     int expectedCount = getBAMRecordCount(new File(path.replace("file://", "")));
     Assert.assertEquals(expectedCount, CountReads.countReadsLegacy(path, "local", splitSize));

@@ -16,7 +16,7 @@ import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
-public class BamSink {
+class BamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
 

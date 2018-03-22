@@ -23,7 +23,7 @@ import scala.Tuple2;
  *
  * @see BamSource
  */
-public class BgzfBlockSource implements Serializable {
+class BgzfBlockSource implements Serializable {
 
   private final boolean useNio;
   private final FileSystemWrapper fileSystemWrapper;
