@@ -2,6 +2,7 @@ package org.seqdoop.hadoop_bam.spark;
 
 import htsjdk.samtools.ValidationStringency;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -30,8 +31,8 @@ public class BamSourceTest {
 
   @Test
   @Parameters({ "false", "true" })
-  public void testFindAllReadStarts(boolean useNio) throws IOException {
-    String inputPath = "file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam";
+  public void testFindAllReadStarts(boolean useNio) throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource("1.bam").toURI().toString();
     int splitSize = 128 * 1024;
 
     // find all the read start positions in each partition

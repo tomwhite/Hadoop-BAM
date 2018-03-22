@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.util.Iterator;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -37,21 +38,24 @@ public class VcfDatasetTest {
 
   private Object[] parametersForTestReadAndWrite() {
     return new Object[][] {
-        {"file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/test.vcf", ".vcf", 128 * 1024},
-        {"file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/test.vcf", ".vcf.gz", 128 * 1024},
-        {"file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/test.vcf", ".vcf.bgz", 128 * 1024},
+        {"test.vcf", ".vcf", 128 * 1024},
+        {"test.vcf", ".vcf.gz", 128 * 1024},
+        {"test.vcf", ".vcf.bgz", 128 * 1024},
     };
   }
 
   @Test
   @Parameters
-  public void testReadAndWrite(String inputPath, String outputExtension, int splitSize) throws IOException {
+  public void testReadAndWrite(String inputFile, String outputExtension, int splitSize)
+      throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
+
     VcfDatasetFactory vcfDatasetFactory = VcfDatasetFactory.makeDefault(jsc)
         .splitSize(splitSize);
 
     VcfDataset vcfDataset = vcfDatasetFactory.read(inputPath);
 
-    int expectedCount = getVariantCount(new File(inputPath.replace("file://", "")));
+    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")));
     Assert.assertEquals(expectedCount, vcfDataset.getVariantsRdd().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -69,8 +73,8 @@ public class VcfDatasetTest {
   }
 
   @Test
-  public void testBgzfVcfIsSplitIntoMultiplePartitions() throws IOException {
-    String inputPath = "file:///Users/tom/workspace/Hadoop-BAM/src/test/resources/HiSeq.10000.vcf.bgzf.gz";
+  public void testBgzfVcfIsSplitIntoMultiplePartitions() throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource("HiSeq.10000.vcf.bgzf.gz").toURI().toString();
 
     JavaRDD<VariantContext> variants = VcfDatasetFactory.makeDefault(jsc)
         .splitSize(128 * 1024)
@@ -79,7 +83,7 @@ public class VcfDatasetTest {
 
     Assert.assertTrue(variants.getNumPartitions() > 1);
 
-    int expectedCount = getVariantCount(new File(inputPath.replace("file://", "")));
+    int expectedCount = getVariantCount(new File(inputPath.replace("file:", "")));
     Assert.assertEquals(expectedCount, variants.count());
   }
 

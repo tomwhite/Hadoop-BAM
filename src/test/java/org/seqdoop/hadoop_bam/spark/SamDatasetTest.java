@@ -6,6 +6,7 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Iterator;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -33,21 +34,23 @@ public class SamDatasetTest {
 
   private Object[] parametersForTestReadAndWrite() {
     return new Object[][] {
-        {"file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam", ".bam", 128 * 1024, false},
-        {"file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam", ".bam", 128 * 1024, true},
+        {"1.bam", ".bam", 128 * 1024, false},
+        {"1.bam", ".bam", 128 * 1024, true},
     };
   }
 
   @Test
   @Parameters
-  public void testReadAndWrite(String inputPath, String outputExtension, int splitSize, boolean useNio) throws IOException {
+  public void testReadAndWrite(String inputFile, String outputExtension, int splitSize, boolean useNio)
+      throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
     SamDatasetFactory samDatasetFactory = SamDatasetFactory.makeDefault(jsc)
         .splitSize(splitSize)
         .useNio(useNio);
 
     SamDataset samDataset = samDatasetFactory.read(inputPath);
 
-    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file://", "")));
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")));
     Assert.assertEquals(expectedCount, samDataset.getReadsRdd().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -60,17 +63,19 @@ public class SamDatasetTest {
   }
 
   @Test
-  public void testReadBamsInDirectory() throws IOException {
+  public void testReadBamsInDirectory() throws IOException, URISyntaxException {
     SamDatasetFactory samDatasetFactory = SamDatasetFactory.makeDefault(jsc)
         .splitSize(128 * 1024);
 
     // directory containing two BAM files
-    String inputPath = "file:///Users/tom/workspace/gatk//src/test/resources/org/broadinstitute/hellbender/tools/BQSR/HiSeq.1mb.1RG.2k_lines.alternate.recalibrated.DIQ.sharded.bam";
+    File inputDir = new File(ClassLoader.getSystemClassLoader().getResource("HiSeq.1mb.1RG.2k_lines.alternate.recalibrated.DIQ.sharded.bam").toURI());
+    String inputPath = inputDir.toURI().toString();
 
     SamDataset samDataset = samDatasetFactory.read(inputPath);
 
-    int expectedCount = getBAMRecordCount(new File("/Users/tom/workspace/gatk//src/test/resources/org/broadinstitute/hellbender/tools/BQSR/HiSeq.1mb.1RG.2k_lines.alternate.recalibrated.DIQ.sharded.bam/part-r-00000.bam")) +
-        getBAMRecordCount(new File("/Users/tom/workspace/gatk//src/test/resources/org/broadinstitute/hellbender/tools/BQSR/HiSeq.1mb.1RG.2k_lines.alternate.recalibrated.DIQ.sharded.bam/part-r-00001.bam"));
+    int expectedCount =
+        getBAMRecordCount(new File(inputDir, "part-r-00000.bam")) +
+        getBAMRecordCount(new File(inputDir, "part-r-00001.bam"));
     Assert.assertEquals(expectedCount, samDataset.getReadsRdd().count());
   }
 

@@ -1,6 +1,7 @@
 package org.seqdoop.hadoop_bam.spark;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.List;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -30,8 +31,8 @@ public class BgzfBlockSourceTest {
   
   @Test
   @Parameters({ "false", "true" })
-  public void testFindAllBlocks(boolean useNio) throws IOException {
-    String inputPath = "file:///Users/tom/workspace/spark-bam/test_bams/src/main/resources/1.bam";
+  public void testFindAllBlocks(boolean useNio) throws IOException, URISyntaxException {
+    String inputPath = ClassLoader.getSystemClassLoader().getResource("1.bam").toURI().toString();
     int splitSize = 128 * 1024;
 
     // find all the blocks in each partition
