@@ -82,20 +82,20 @@ class BamSource implements Serializable {
    * @return an RDD for the first read starting in each partition, or null for partitions
    * that don't have a read starting in them.
    */
-  <T extends Locatable> JavaRDD<ReadStart> getReadStarts(JavaSparkContext jsc, String path, int splitSize, List<T> intervals, boolean traverseUnplacedUnmapped)
+  <T extends Locatable> JavaRDD<ReadStart> getReadStarts(JavaSparkContext jsc, String path, int splitSize, List<T> intervals, boolean traverseUnplacedUnmapped, ValidationStringency stringency)
       throws IOException {
     Configuration conf = jsc.hadoopConfiguration();
     SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
     return bgzfBlockSource.getBgzfBlocks(jsc, path, splitSize)
         .mapPartitions((FlatMapFunction<Iterator<BgzfBlock>, ReadStart>) bgzfBlocks -> Collections
-            .singletonList(getFirstReadInPartition(confSer.getConf(), bgzfBlocks, intervals, traverseUnplacedUnmapped)).iterator());
+            .singletonList(getFirstReadInPartition(confSer.getConf(), bgzfBlocks, intervals, traverseUnplacedUnmapped, stringency)).iterator());
   }
 
   /**
    * @return the first read starting in the partition, or null if there is none (e.g. in the case
    * of long reads, and/or very small partitions).
    */
-  private <T extends Locatable> ReadStart getFirstReadInPartition(Configuration conf, Iterator<BgzfBlock> bgzfBlocks, List<T> intervals, boolean traverseUnplacedUnmapped)
+  private <T extends Locatable> ReadStart getFirstReadInPartition(Configuration conf, Iterator<BgzfBlock> bgzfBlocks, List<T> intervals, boolean traverseUnplacedUnmapped, ValidationStringency stringency)
       throws IOException {
     String path = null;
     BamRecordGuesser bamRecordGuesser = null;
@@ -110,7 +110,7 @@ class BamSource implements Serializable {
           SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(headerIn, conf);
           bamRecordGuesser = getBamRecordGuesser(conf, path, header);
           if (intervals != null) {
-            try (SamReader samReader = createSamReader(conf, path)) {
+            try (SamReader samReader = createSamReader(conf, path, stringency)) {
               if (!samReader.hasIndex()) {
                 throw new IllegalArgumentException(
                     "Intervals set but no BAM index file found for " + path);
@@ -153,15 +153,15 @@ class BamSource implements Serializable {
   /**
    * @return an RDD of reads.
    */
-  public JavaRDD<SAMRecord> getReads(JavaSparkContext jsc, String path, int splitSize) throws IOException {
-    return getReads(jsc, path, splitSize, null, false);
+  public JavaRDD<SAMRecord> getReads(JavaSparkContext jsc, String path, int splitSize, ValidationStringency stringency) throws IOException {
+    return getReads(jsc, path, splitSize, null, false, stringency);
   }
 
   /**
    * @return an RDD of reads for a bounded traversal (intervals and whether to return unplaced, unmapped reads).
    */
-  public <T extends Locatable> JavaRDD<SAMRecord> getReads(JavaSparkContext jsc, String path, int splitSize, List<T> intervals, boolean traverseUnplacedUnmapped) throws IOException {
-    JavaRDD<ReadStart> readStartsRdd = getReadStarts(jsc, path, splitSize, intervals, traverseUnplacedUnmapped);
+  public <T extends Locatable> JavaRDD<SAMRecord> getReads(JavaSparkContext jsc, String path, int splitSize, List<T> intervals, boolean traverseUnplacedUnmapped, ValidationStringency stringency) throws IOException {
+    JavaRDD<ReadStart> readStartsRdd = getReadStarts(jsc, path, splitSize, intervals, traverseUnplacedUnmapped, stringency);
     List<ReadStart> readStarts = readStartsRdd.collect();
     // Find the end of the partition, which is either the start of the read in the next partition,
     // or the end of the file if a partition is the last for a file.
@@ -204,7 +204,7 @@ class BamSource implements Serializable {
           }
           Configuration conf = confSer.getConf();
           String p = readStart.getPath();
-          BAMFileReader bamFileReader = createBamFileReader(conf, p);
+          BAMFileReader bamFileReader = createBamFileReader(conf, p, stringency);
           BAMFileSpan splitSpan = new BAMFileSpan(readRange);
           BAMFileSpan span = readStart.getSpan();
           if (span == null) {
@@ -221,7 +221,7 @@ class BamSource implements Serializable {
             if (traverseUnplacedUnmapped && readStart.getUnplacedUnmappedStart() != -1 &&
                 readRange.getChunkStart() <= readStart.getUnplacedUnmappedStart() &&
                 readStart.getUnplacedUnmappedStart() < readRange.getChunkEnd()) { // TODO correct?
-              Iterator<SAMRecord> unplacedUnmappedReadsIterator = createBamFileReader(conf, p).queryUnmapped();
+              Iterator<SAMRecord> unplacedUnmappedReadsIterator = createBamFileReader(conf, p, stringency).queryUnmapped();
               return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
             }
             return intervalReadsIterator;
@@ -229,8 +229,8 @@ class BamSource implements Serializable {
         });
   }
 
-  private BAMFileReader createBamFileReader(Configuration conf, String path) throws IOException {
-    return (BAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) createSamReader(conf, path)).underlyingReader();
+  private BAMFileReader createBamFileReader(Configuration conf, String path, ValidationStringency stringency) throws IOException {
+    return (BAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) createSamReader(conf, path, stringency)).underlyingReader();
   }
 
   private SeekableStream findIndex(Configuration conf, String path) throws IOException {
@@ -245,10 +245,9 @@ class BamSource implements Serializable {
     return null;
   }
 
-  private SamReader createSamReader(Configuration conf, String path) throws IOException {
+  private SamReader createSamReader(Configuration conf, String path, ValidationStringency stringency) throws IOException {
     SeekableStream in = fileSystemWrapper.open(conf, path);
     SeekableStream indexStream = findIndex(conf, path);
-    ValidationStringency stringency = SAMHeaderReader.getValidationStringency(conf);
     return createSamReader(in, indexStream, stringency);
   }
 

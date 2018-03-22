@@ -1,5 +1,6 @@
 package org.seqdoop.hadoop_bam.spark;
 
+import htsjdk.samtools.ValidationStringency;
 import java.io.IOException;
 import java.util.Arrays;
 import junitparams.JUnitParamsRunner;
@@ -35,7 +36,7 @@ public class BamSourceTest {
 
     // find all the read start positions in each partition
     JavaRDD<Long> readStarts = new BamSource(useNio)
-        .getReadStarts(jsc, inputPath, splitSize, null, false)
+        .getReadStarts(jsc, inputPath, splitSize, null, false, ValidationStringency.SILENT)
         .map(BamSource.ReadStart::getVirtualStart);
 
     Assert.assertEquals(Arrays.asList(45846L, 9065791718L, 17278959807L, 26929070350L, 34961096975L),

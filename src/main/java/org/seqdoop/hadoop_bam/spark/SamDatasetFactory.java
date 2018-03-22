@@ -2,6 +2,7 @@ package org.seqdoop.hadoop_bam.spark;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.util.List;
@@ -12,6 +13,7 @@ public class SamDatasetFactory {
 
   private JavaSparkContext sparkContext;
   private int splitSize;
+  private ValidationStringency validationStringency = ValidationStringency.DEFAULT_STRINGENCY;
   private boolean useNio;
 
   public static SamDatasetFactory makeDefault(JavaSparkContext sparkContext) {
@@ -27,6 +29,11 @@ public class SamDatasetFactory {
     return this;
   }
 
+  public SamDatasetFactory validationStringency(ValidationStringency validationStringency) {
+    this.validationStringency = validationStringency;
+    return this;
+  }
+
   public SamDatasetFactory useNio(boolean useNio) {
     this.useNio = useNio;
     return this;
@@ -35,14 +42,14 @@ public class SamDatasetFactory {
   public SamDataset read(String path) throws IOException {
     BamSource bamSource = new BamSource(useNio);
     SAMFileHeader header = bamSource.getFileHeader(sparkContext, path);
-    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize);
+    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, validationStringency);
     return new SamDataset(header, reads);
   }
 
   public <T extends Locatable> SamDataset read(String path, List<T> intervals, boolean traverseUnplacedUnmapped) throws IOException {
     BamSource bamSource = new BamSource(useNio);
     SAMFileHeader header = bamSource.getFileHeader(sparkContext, path);
-    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, intervals, traverseUnplacedUnmapped);
+    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, intervals, traverseUnplacedUnmapped, validationStringency);
     return new SamDataset(header, reads);
   }
 

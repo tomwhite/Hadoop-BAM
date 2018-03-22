@@ -22,9 +22,9 @@ public class CountReads {
 
   public static long countReadsNio(String path, String sparkMaster, int splitSize) throws IOException {
     try (JavaSparkContext jsc = new JavaSparkContext(sparkMaster, "CountReadsNio")) {
-      jsc.hadoopConfiguration().set(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY, ValidationStringency.SILENT.name());
       return SamDatasetFactory.makeDefault(jsc)
           .splitSize(splitSize)
+          .validationStringency(ValidationStringency.SILENT)
           .useNio(true)
           .read(path)
           .getReadsRdd()
@@ -34,9 +34,9 @@ public class CountReads {
 
   public static long countReads(String path, String sparkMaster, int splitSize) throws IOException {
     try (JavaSparkContext jsc = new JavaSparkContext(sparkMaster, "CountReads")) {
-      jsc.hadoopConfiguration().set(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY, ValidationStringency.SILENT.name());
       return SamDatasetFactory.makeDefault(jsc)
           .splitSize(splitSize)
+          .validationStringency(ValidationStringency.SILENT)
           .read(path)
           .getReadsRdd()
           .count();
