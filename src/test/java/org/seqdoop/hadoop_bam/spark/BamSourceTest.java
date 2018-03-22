@@ -7,27 +7,12 @@ import java.util.Arrays;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
-public class BamSourceTest {
-
-  private static JavaSparkContext jsc;
-
-  @BeforeClass
-  public static void setup() {
-    jsc = new JavaSparkContext("local", "myapp");
-  }
-
-  @AfterClass
-  public static void teardown() {
-    jsc.stop();
-  }
+public class BamSourceTest extends BaseTest {
 
   @Test
   @Parameters({ "false", "true" })

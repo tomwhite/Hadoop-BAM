@@ -248,11 +248,6 @@ class BamSource implements Serializable {
   private SamReader createSamReader(Configuration conf, String path, ValidationStringency stringency) throws IOException {
     SeekableStream in = fileSystemWrapper.open(conf, path);
     SeekableStream indexStream = findIndex(conf, path);
-    return createSamReader(in, indexStream, stringency);
-  }
-
-  private static SamReader createSamReader(SeekableStream in, SeekableStream inIndex,
-      ValidationStringency stringency) {
     SamReaderFactory readerFactory = SamReaderFactory.makeDefault()
         .setOption(SamReaderFactory.Option.CACHE_FILE_BASED_INDEXES, true)
         .setOption(SamReaderFactory.Option.EAGERLY_DECODE, false)
@@ -261,8 +256,8 @@ class BamSource implements Serializable {
       readerFactory.validationStringency(stringency);
     }
     SamInputResource resource = SamInputResource.of(in);
-    if (inIndex != null) {
-      resource.index(inIndex);
+    if (indexStream != null) {
+      resource.index(indexStream);
     }
     return readerFactory.open(resource);
   }

@@ -32,11 +32,15 @@ public class CountReads {
     }
   }
 
-  public static long countReads(String path, String sparkMaster, int splitSize) throws IOException {
+  public static long countReads(String path, String sparkMaster, int splitSize, String cramReferenceSource) throws IOException {
     try (JavaSparkContext jsc = new JavaSparkContext(sparkMaster, "CountReads")) {
-      return SamDatasetFactory.makeDefault(jsc)
+      SamDatasetFactory samDatasetFactory = SamDatasetFactory.makeDefault(jsc)
           .splitSize(splitSize)
-          .validationStringency(ValidationStringency.SILENT)
+          .validationStringency(ValidationStringency.SILENT);
+      if (cramReferenceSource != null) {
+        samDatasetFactory.referenceSourcePath(cramReferenceSource);
+      }
+      return samDatasetFactory
           .read(path)
           .getReadsRdd()
           .count();
@@ -44,14 +48,15 @@ public class CountReads {
   }
 
   public static void main(String... args) throws IOException {
-    if (args.length != 4) {
-      System.err.println("Usage: CountReads <mode> <BAM file> <spark master> <split size>");
+    if (args.length != 4 && args.length != 5) {
+      System.err.println("Usage: CountReads <mode> <BAM file> <spark master> <split size> [CRAM reference source]");
       System.exit(1);
     }
     String mode = args[0];
     String path = args[1];
     String sparkMaster = args[2];
     int splitSize = Integer.parseInt(args[3]);
+    String cramReferenceSource = args.length == 4 ? null : args[4];
     switch (mode) {
       case "legacy": {
         System.out.println(countReadsLegacy(path, sparkMaster, splitSize));
@@ -62,7 +67,7 @@ public class CountReads {
         break;
       }
       default: {
-        System.out.println(countReads(path, sparkMaster, splitSize));
+        System.out.println(countReads(path, sparkMaster, splitSize, cramReferenceSource));
         break;
       }
     }

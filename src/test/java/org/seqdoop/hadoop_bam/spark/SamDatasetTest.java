@@ -4,53 +4,47 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SamInputResource;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.cram.ref.ReferenceSource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Iterator;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @RunWith(JUnitParamsRunner.class)
-public class SamDatasetTest {
-
-  private static JavaSparkContext jsc;
-
-  @BeforeClass
-  public static void setup() {
-    jsc = new JavaSparkContext("local", "myapp");
-  }
-
-  @AfterClass
-  public static void teardown() {
-    jsc.stop();
-  }
+public class SamDatasetTest extends BaseTest {
 
   private Object[] parametersForTestReadAndWrite() {
     return new Object[][] {
-        {"1.bam", ".bam", 128 * 1024, false},
-        {"1.bam", ".bam", 128 * 1024, true},
+        {"1.bam", null, ".bam", 128 * 1024, false},
+        {"1.bam", null, ".bam", 128 * 1024, true},
+        {"valid.cram", "valid.fasta", ".bam", 128 * 1024, false},
     };
   }
 
   @Test
   @Parameters
-  public void testReadAndWrite(String inputFile, String outputExtension, int splitSize, boolean useNio)
+  public void testReadAndWrite(String inputFile, String cramReferenceFile, String outputExtension, int splitSize, boolean useNio)
       throws IOException, URISyntaxException {
     String inputPath = ClassLoader.getSystemClassLoader().getResource(inputFile).toURI().toString();
+
     SamDatasetFactory samDatasetFactory = SamDatasetFactory.makeDefault(jsc)
         .splitSize(splitSize)
         .useNio(useNio);
+    ReferenceSource referenceSource = null;
+    if (cramReferenceFile != null) {
+      String cramReferencePath = ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI().toString();
+      samDatasetFactory.referenceSourcePath(cramReferencePath);
+      referenceSource = new ReferenceSource(new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI()));
+    }
 
     SamDataset samDataset = samDatasetFactory.read(inputPath);
 
-    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")));
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), referenceSource);
     Assert.assertEquals(expectedCount, samDataset.getReadsRdd().count());
 
     File outputFile = File.createTempFile("test", outputExtension);
@@ -59,7 +53,7 @@ public class SamDatasetTest {
 
     samDatasetFactory.write(samDataset, outputPath);
 
-    Assert.assertEquals(expectedCount, getBAMRecordCount(outputFile));
+    Assert.assertEquals(expectedCount, getBAMRecordCount(outputFile, referenceSource));
   }
 
   @Test
@@ -80,7 +74,12 @@ public class SamDatasetTest {
   }
 
   private static int getBAMRecordCount(final File bamFile) throws IOException {
+    return getBAMRecordCount(bamFile, null);
+  }
+
+  private static int getBAMRecordCount(final File bamFile, ReferenceSource referenceSource) throws IOException {
     final SamReader bamReader = SamReaderFactory.makeDefault()
+        .referenceSource(referenceSource)
         .open(SamInputResource.of(bamFile));
     final Iterator<SAMRecord> it = bamReader.iterator();
     int recCount = 0;

@@ -6,28 +6,13 @@ import java.util.List;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.seqdoop.hadoop_bam.spark.BgzfBlockGuesser.BgzfBlock;
 
 @RunWith(JUnitParamsRunner.class)
-public class BgzfBlockSourceTest {
-
-  private static JavaSparkContext jsc;
-
-  @BeforeClass
-  public static void setup() {
-    jsc = new JavaSparkContext("local", "myapp");
-  }
-
-  @AfterClass
-  public static void teardown() {
-    jsc.stop();
-  }
+public class BgzfBlockSourceTest extends BaseTest {
   
   @Test
   @Parameters({ "false", "true" })
