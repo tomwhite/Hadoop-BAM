@@ -31,6 +31,7 @@ public class SamDatasetTest extends BaseTest {
         {"1.bam", null, ".bam", 128 * 1024, false},
         {"1.bam", null, ".bam", 128 * 1024, true},
         {"valid.cram", "valid.fasta", ".bam", 128 * 1024, false},
+        {"valid_no_index.cram", "valid.fasta", ".bam", 128 * 1024, false},
     };
   }
 
@@ -84,40 +85,86 @@ public class SamDatasetTest extends BaseTest {
   private Object[] parametersForTestIntervals() {
     return new Object[][] {
         {
-          new TraversalParameters<>(Arrays.asList(
-            new Interval("chr21", 5000, 9999), // includes two unpaired fragments
-            new Interval("chr21", 20000, 22999)
-          ), false)
+            null,
+            new TraversalParameters<>(Arrays.asList(
+              new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+              new Interval("chr21", 20000, 22999)
+            ), false),
+            ".bam", ".bai"
         },
         {
+            null,
             new TraversalParameters<>(Arrays.asList(
                 new Interval("chr21", 1, 1000135) // covers whole chromosome
-            ), false)
+            ), false),
+            ".bam", ".bai"
         },
         {
+            null,
             new TraversalParameters<>(Arrays.asList(
                 new Interval("chr21", 5000, 9999), // includes two unpaired fragments
                 new Interval("chr21", 20000, 22999)
-            ), true)
+            ), true),
+            ".bam", ".bai"
         },
         {
-            new TraversalParameters<>(null, true)
+            null,
+            new TraversalParameters<>(null, true),
+            ".bam", ".bai"
         },
+        {
+            "test.fa",
+            new TraversalParameters<>(Arrays.asList(
+                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+                new Interval("chr21", 20000, 22999)
+            ), false),
+            ".cram", ".crai"
+        },
+        {
+            "test.fa",
+            new TraversalParameters<>(Arrays.asList(
+                new Interval("chr21", 1, 1000135) // covers whole chromosome
+            ), false),
+            ".cram", ".crai"
+        },
+//        {
+//            "test.fa",
+//            new TraversalParameters<>(Arrays.asList(
+//                new Interval("chr21", 5000, 9999), // includes two unpaired fragments
+//                new Interval("chr21", 20000, 22999)
+//            ), true),
+//            ".cram", ".crai"
+//        },
+//        {
+//            "test.fa",
+//            new TraversalParameters<>(null, true),
+//            ".cram", ".crai"
+//        },
     };
   }
 
   @Test
   @Parameters
-  public <T extends Locatable> void testIntervals(TraversalParameters<T> traversalParameters) throws Exception {
-    String inputPath = BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate).toURI().toString();
-
+  public <T extends Locatable> void testIntervals(String cramReferenceFile, TraversalParameters<T> traversalParameters, String extension, String indexExtension) throws Exception {
     SamDatasetFactory samDatasetFactory = SamDatasetFactory.makeDefault(jsc)
         .splitSize(40000)
         .useNio(false);
 
+    ReferenceSource referenceSource = null;
+    File refFile = null;
+    if (cramReferenceFile != null) {
+      refFile = new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI());
+      String cramReferencePath = ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI().toString();
+      samDatasetFactory.referenceSourcePath(cramReferencePath);
+      referenceSource = new ReferenceSource(new File(ClassLoader.getSystemClassLoader().getResource(cramReferenceFile).toURI()));
+    }
+
+    String inputPath = BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate, extension, indexExtension, refFile).toURI().toString();
+
     SamDataset samDataset = samDatasetFactory.read(inputPath, traversalParameters);
 
-    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), null, traversalParameters);
+    int expectedCount = getBAMRecordCount(new File(inputPath.replace("file:", "")), referenceSource, traversalParameters);
+
     Assert.assertEquals(expectedCount, samDataset.getReadsRdd().count());
   }
 

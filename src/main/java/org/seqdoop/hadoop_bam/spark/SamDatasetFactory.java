@@ -46,24 +46,21 @@ public class SamDatasetFactory {
   }
 
   public SamDataset read(String path) throws IOException {
+    return read(path, null);
+  }
+
+  public <T extends Locatable> SamDataset read(String path, TraversalParameters<T> traversalParameters) throws IOException {
     if (path.endsWith(CramIO.CRAM_FILE_EXTENSION)) {
       CramSource cramSource = new CramSource();
       SAMFileHeader header = cramSource.getFileHeader(sparkContext, path, validationStringency, referenceSourcePath);
-      JavaRDD<SAMRecord> reads = cramSource.getReads(sparkContext, path, splitSize, validationStringency, referenceSourcePath);
+      JavaRDD<SAMRecord> reads = cramSource.getReads(sparkContext, path, splitSize, traversalParameters, validationStringency, referenceSourcePath);
       return new SamDataset(header, reads);
     } else {
       BamSource bamSource = new BamSource(useNio);
       SAMFileHeader header = bamSource.getFileHeader(sparkContext, path);
-      JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, validationStringency);
+      JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, traversalParameters, validationStringency);
       return new SamDataset(header, reads);
     }
-  }
-
-  public <T extends Locatable> SamDataset read(String path, TraversalParameters<T> traversalParameters) throws IOException {
-    BamSource bamSource = new BamSource(useNio);
-    SAMFileHeader header = bamSource.getFileHeader(sparkContext, path);
-    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, traversalParameters, validationStringency);
-    return new SamDataset(header, reads);
   }
 
   public void write(SamDataset samDataset, String path) throws IOException {
