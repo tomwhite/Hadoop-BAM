@@ -22,7 +22,7 @@ public class BamSourceTest extends BaseTest {
 
     // find all the read start positions in each partition
     JavaRDD<Long> readStarts = new BamSource(useNio)
-        .getReadStarts(jsc, inputPath, splitSize, null, false, ValidationStringency.SILENT)
+        .getReadStarts(jsc, inputPath, splitSize, null, ValidationStringency.SILENT)
         .map(BamSource.ReadStart::getVirtualStart);
 
     Assert.assertEquals(Arrays.asList(45846L, 9065791718L, 17278959807L, 26929070350L, 34961096975L),

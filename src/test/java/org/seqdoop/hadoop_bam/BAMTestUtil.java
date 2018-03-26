@@ -12,7 +12,7 @@ import htsjdk.samtools.SamReaderFactory;
 import java.io.File;
 import java.io.IOException;
 
-class BAMTestUtil {
+public class BAMTestUtil {
   public static File writeBamFile(int numPairs, SAMFileHeader.SortOrder sortOrder)
       throws IOException {
     // file will be both queryname and coordinate sorted, so use one or the other

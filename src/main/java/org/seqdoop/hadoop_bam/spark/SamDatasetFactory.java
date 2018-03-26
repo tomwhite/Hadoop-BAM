@@ -6,7 +6,6 @@ import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.cram.build.CramIO;
 import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
-import java.util.List;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
@@ -60,10 +59,10 @@ public class SamDatasetFactory {
     }
   }
 
-  public <T extends Locatable> SamDataset read(String path, List<T> intervals, boolean traverseUnplacedUnmapped) throws IOException {
+  public <T extends Locatable> SamDataset read(String path, TraversalParameters<T> traversalParameters) throws IOException {
     BamSource bamSource = new BamSource(useNio);
     SAMFileHeader header = bamSource.getFileHeader(sparkContext, path);
-    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, intervals, traverseUnplacedUnmapped, validationStringency);
+    JavaRDD<SAMRecord> reads = bamSource.getReads(sparkContext, path, splitSize, traversalParameters, validationStringency);
     return new SamDataset(header, reads);
   }
 
