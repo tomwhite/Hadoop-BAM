@@ -21,6 +21,7 @@ public class CramContainerIterator implements Iterator<Container> {
   private Container nextContainer;
   private boolean eof = false;
   private long offset = 0;
+  private long count;
 
   public CramContainerIterator(final SeekableStream inputStream) throws IOException {
     cramHeader = CramIO.readCramHeader(inputStream);
@@ -28,7 +29,6 @@ public class CramContainerIterator implements Iterator<Container> {
   }
 
   void readNextContainer() {
-    int count = 0;
     try {
       //System.out.println("tw: pos: " + inputStream.position());
 
@@ -53,10 +53,6 @@ public class CramContainerIterator implements Iterator<Container> {
       //System.out.println();
 
       offset += containerSizeInBytes;
-      count++;
-      if (count > 10) {
-        throw new RuntimeException();
-      }
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
@@ -64,6 +60,10 @@ public class CramContainerIterator implements Iterator<Container> {
     if (nextContainer.isEOF()) {
       eof = true;
       nextContainer = null;
+    }
+
+    if (count++ % 1000 == 0) {
+      System.out.println("Containers processed: " + count);
     }
   }
 
