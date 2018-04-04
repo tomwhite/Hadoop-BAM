@@ -30,7 +30,7 @@ public class CramContainerIterator implements Iterator<Container> {
   void readNextContainer() {
     int count = 0;
     try {
-      System.out.println("tw: pos: " + inputStream.position());
+      //System.out.println("tw: pos: " + inputStream.position());
 
       final CountingInputStream cis = new CountingInputStream(inputStream);
       nextContainer = ContainerIO.readContainer(cramHeader.getVersion(), cis);
@@ -38,19 +38,19 @@ public class CramContainerIterator implements Iterator<Container> {
 
       nextContainer.offset = offset;
 
-      System.out.println("tw: offset: " + offset);
-      System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
-      System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
-      System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
-      System.out.println("\ttw: sequenceId: " + nextContainer.sequenceId);
-      System.out.println("\ttw: alignmentStart: " + nextContainer.alignmentStart);
-      System.out.println("\ttw: alignmentSpan: " + nextContainer.alignmentSpan);
-      System.out.println("\ttw: nofRecords: " + nextContainer.nofRecords);
-      System.out.println("\ttw: globalRecordCounter: " + nextContainer.globalRecordCounter);
-      System.out.println("\ttw: bases: " + nextContainer.bases);
-      System.out.println("\ttw: blockCount: " + nextContainer.blockCount);
-      System.out.println("\ttw: num landmarks: " + nextContainer.landmarks.length);
-      System.out.println();
+      //System.out.println("tw: offset: " + offset);
+      //System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
+      //System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
+      //System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
+      //System.out.println("\ttw: sequenceId: " + nextContainer.sequenceId);
+      //System.out.println("\ttw: alignmentStart: " + nextContainer.alignmentStart);
+      //System.out.println("\ttw: alignmentSpan: " + nextContainer.alignmentSpan);
+      //System.out.println("\ttw: nofRecords: " + nextContainer.nofRecords);
+      //System.out.println("\ttw: globalRecordCounter: " + nextContainer.globalRecordCounter);
+      //System.out.println("\ttw: bases: " + nextContainer.bases);
+      //System.out.println("\ttw: blockCount: " + nextContainer.blockCount);
+      //System.out.println("\ttw: num landmarks: " + nextContainer.landmarks.length);
+      //System.out.println();
 
       offset += containerSizeInBytes;
       count++;
