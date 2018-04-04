@@ -42,6 +42,7 @@ public class CramContainerIterator implements Iterator<Container> {
       System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
       System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
       System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
+      System.out.println("tw: num landmarks: " + nextContainer.landmarks.length);
 
       offset += containerSizeInBytes;
       count++;
