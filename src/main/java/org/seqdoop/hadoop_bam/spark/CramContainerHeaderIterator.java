@@ -22,6 +22,7 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
   private Container nextContainer;
   private boolean eof = false;
   private long offset = 0;
+  private int count;
 
   public CramContainerHeaderIterator(final SeekableStream inputStream) throws IOException {
     cramHeader = CramIO.readCramHeader(inputStream);
@@ -32,21 +33,21 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
   void readNextContainer() {
     try {
       long pos0 = inputStream.position();
-      if (pos0 == 1478644) {
-        final CountingInputStream cis = new CountingInputStream(inputStream);
-        Container nc = ContainerIO.readContainer(cramHeader.getVersion(), cis);
-        final long containerSizeInBytes = cis.getCount();
-        //System.out.println("\t\ttw: nextContainer.containerByteSize: " + nc.containerByteSize);
-        //System.out.println("\t\ttw: sequenceId: " + nc.sequenceId);
-        //System.out.println("\t\ttw: alignmentStart: " + nc.alignmentStart);
-        //System.out.println("\t\ttw: alignmentSpan: " + nc.alignmentSpan);
-        //System.out.println("\t\ttw: nofRecords: " + nc.nofRecords);
-        //System.out.println("\t\ttw: globalRecordCounter: " + nc.globalRecordCounter);
-        //System.out.println("\t\ttw: bases: " + nc.bases);
-        //System.out.println("\t\ttw: blockCount: " + nc.blockCount);
-        //System.out.println("\t\ttw: num landmarks: " + nc.landmarks.length);
-        inputStream.seek(pos0);
-      }
+//      if (pos0 == 1478644) {
+//        final CountingInputStream cis = new CountingInputStream(inputStream);
+//        Container nc = ContainerIO.readContainer(cramHeader.getVersion(), cis);
+//        final long containerSizeInBytes = cis.getCount();
+//        //System.out.println("\t\ttw: nextContainer.containerByteSize: " + nc.containerByteSize);
+//        //System.out.println("\t\ttw: sequenceId: " + nc.sequenceId);
+//        //System.out.println("\t\ttw: alignmentStart: " + nc.alignmentStart);
+//        //System.out.println("\t\ttw: alignmentSpan: " + nc.alignmentSpan);
+//        //System.out.println("\t\ttw: nofRecords: " + nc.nofRecords);
+//        //System.out.println("\t\ttw: globalRecordCounter: " + nc.globalRecordCounter);
+//        //System.out.println("\t\ttw: bases: " + nc.bases);
+//        //System.out.println("\t\ttw: blockCount: " + nc.blockCount);
+//        //System.out.println("\t\ttw: num landmarks: " + nc.landmarks.length);
+//        inputStream.seek(pos0);
+//      }
 
       final CountingInputStream cis = new CountingInputStream(inputStream);
       nextContainer = ContainerIO.readContainerHeader(cramHeader.getVersion().major, cis);
@@ -81,6 +82,9 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
     if (nextContainer.isEOF()) {
       eof = true;
       nextContainer = null;
+    }
+    if (count++ % 1000 == 0) {
+      System.out.println("Containers processed: " + count);
     }
   }
 
