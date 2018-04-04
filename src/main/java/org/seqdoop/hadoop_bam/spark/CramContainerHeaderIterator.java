@@ -36,6 +36,7 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       final long containerSizeInBytes = (pos - offset) + nextContainer.containerByteSize; // containerByteSize excludes header
       System.out.println("tw: offset: " + offset);
       System.out.println("tw: pos: " + pos);
+      System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
       System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
       System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
       offset += containerSizeInBytes;
