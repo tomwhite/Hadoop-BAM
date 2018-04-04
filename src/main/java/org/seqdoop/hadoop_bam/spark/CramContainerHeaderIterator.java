@@ -2,6 +2,7 @@ package org.seqdoop.hadoop_bam.spark;
 
 import htsjdk.samtools.cram.build.CramContainerIterator;
 import htsjdk.samtools.cram.build.CramIO;
+import htsjdk.samtools.cram.io.CountingInputStream;
 import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.cram.structure.ContainerIO;
 import htsjdk.samtools.cram.structure.CramHeader;
@@ -30,7 +31,9 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
   void readNextContainer() {
     try {
       long pos0 = inputStream.position();
-      nextContainer = ContainerIO.readContainerHeader(cramHeader.getVersion().major, inputStream);
+      final CountingInputStream cis = new CountingInputStream(inputStream);
+      nextContainer = ContainerIO.readContainerHeader(cramHeader.getVersion().major, cis);
+      final long containerHeaderSizeInBytes = cis.getCount();
       nextContainer.offset = offset;
 
       long pos = inputStream.position();
@@ -38,6 +41,7 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       System.out.println("tw: offset: " + offset);
       System.out.println("tw: pos0: " + pos0);
       System.out.println("tw: pos: " + pos);
+      System.out.println("tw: containerHeaderSizeInBytes: " + containerHeaderSizeInBytes);
       System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
       System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
       System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
