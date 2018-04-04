@@ -7,6 +7,7 @@ import htsjdk.samtools.cram.structure.Container;
 import htsjdk.samtools.cram.structure.ContainerIO;
 import htsjdk.samtools.cram.structure.CramHeader;
 
+import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -16,18 +17,21 @@ import java.util.Iterator;
  */
 public class CramContainerIterator implements Iterator<Container> {
   private CramHeader cramHeader;
-  private InputStream inputStream;
+  private SeekableStream inputStream;
   private Container nextContainer;
   private boolean eof = false;
   private long offset = 0;
 
-  public CramContainerIterator(final InputStream inputStream) throws IOException {
+  public CramContainerIterator(final SeekableStream inputStream) throws IOException {
     cramHeader = CramIO.readCramHeader(inputStream);
     this.inputStream = inputStream;
   }
 
   void readNextContainer() {
+    int count = 0;
     try {
+      System.out.println("tw: pos: " + inputStream.position());
+
       final CountingInputStream cis = new CountingInputStream(inputStream);
       nextContainer = ContainerIO.readContainer(cramHeader.getVersion(), cis);
       final long containerSizeInBytes = cis.getCount();
@@ -40,6 +44,10 @@ public class CramContainerIterator implements Iterator<Container> {
       System.out.println("tw: offset + containerSizeInBytes: " + (offset + containerSizeInBytes));
 
       offset += containerSizeInBytes;
+      count++;
+      if (count > 10) {
+        throw new RuntimeException();
+      }
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
