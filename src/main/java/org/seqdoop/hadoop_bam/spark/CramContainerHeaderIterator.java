@@ -29,12 +29,14 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
 
   void readNextContainer() {
     try {
+      long pos0 = inputStream.position();
       nextContainer = ContainerIO.readContainerHeader(cramHeader.getVersion().major, inputStream);
       nextContainer.offset = offset;
 
       long pos = inputStream.position();
       final long containerSizeInBytes = (pos - offset) + nextContainer.containerByteSize; // containerByteSize excludes header
       System.out.println("tw: offset: " + offset);
+      System.out.println("tw: pos0: " + pos0);
       System.out.println("tw: pos: " + pos);
       System.out.println("tw: nextContainer.containerByteSize: " + nextContainer.containerByteSize);
       System.out.println("tw: containerSizeInBytes: " + containerSizeInBytes);
