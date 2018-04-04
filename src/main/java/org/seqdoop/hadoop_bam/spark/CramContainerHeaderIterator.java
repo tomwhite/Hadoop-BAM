@@ -9,6 +9,7 @@ import htsjdk.samtools.cram.structure.CramHeader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.util.Iterator;
+import org.apache.hadoop.io.IOUtils;
 
 /**
  * Iterate over CRAM containers from an input stream, unlike {@link CramContainerIterator}
@@ -72,7 +73,7 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       System.out.println();
       offset += containerSizeInBytes;
       //inputStream.seek(offset);
-      inputStream.skip(nextContainer.containerByteSize);
+      IOUtils.skipFully(inputStream, nextContainer.containerByteSize);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
