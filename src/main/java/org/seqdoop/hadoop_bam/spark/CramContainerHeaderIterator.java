@@ -54,7 +54,7 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       nextContainer.offset = offset;
 
       long pos = inputStream.position();
-      final long containerSizeInBytes = (pos - offset) + nextContainer.containerByteSize; // containerByteSize excludes header
+      final long containerSizeInBytes = (pos - offset) + (long) nextContainer.containerByteSize; // containerByteSize excludes header
       System.out.println("tw: offset: " + offset);
       System.out.println("tw: pos0: " + pos0);
       System.out.println("tw: pos: " + pos);
@@ -72,8 +72,8 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       System.out.println("\ttw: num landmarks: " + nextContainer.landmarks.length);
       System.out.println();
       offset += containerSizeInBytes;
-      //inputStream.seek(offset);
-      IOUtils.skipFully(inputStream, nextContainer.containerByteSize);
+      inputStream.seek(offset);
+      //IOUtils.skipFully(inputStream, nextContainer.containerByteSize);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
