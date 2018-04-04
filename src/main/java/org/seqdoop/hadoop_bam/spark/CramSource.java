@@ -163,7 +163,7 @@ class CramSource implements Serializable {
   private List<Long> getContainerOffsetsFromFile(Configuration conf, String path, long cramFileLength)
       throws IOException {
     try (SeekableStream seekableStream = fileSystemWrapper.open(conf, path)) {
-      CramContainerHeaderIterator it = new CramContainerHeaderIterator(seekableStream);
+      Iterator<Container> it = new CramContainerIterator(seekableStream);
       List<Long> containerOffsets = new ArrayList<Long>();
       while (it.hasNext()) {
         Container container = it.next();
