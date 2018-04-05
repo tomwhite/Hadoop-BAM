@@ -8,9 +8,10 @@ import htsjdk.samtools.cram.structure.CramHeader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.util.Iterator;
+import org.apache.hadoop.io.IOUtils;
 
 /**
- * Iterate over CRAM containers from an input stream, unlike {@link CramContainerIterator}
+ * Iterate over CRAM containers from an input stream, and unlike {@link CramContainerIterator}
  * only the header of each container is read, rather than the whole stream. As a result, the
  * container data is *not* populated.
  */
@@ -35,7 +36,12 @@ public class CramContainerHeaderIterator implements Iterator<Container> {
       long pos = inputStream.position();
       final long containerSizeInBytes = (pos - offset) + nextContainer.containerByteSize; // containerByteSize excludes header
       offset += containerSizeInBytes;
-      inputStream.seek(offset);
+      // Calling `inputStream.seek(offset)` caused problems on large CRAM files with the offset
+      // being wrong.
+      // Using `skip` is actually more efficient on HDFS since it will move the pointer if
+      // the target position is within the buffer, otherwise it will delegate to `seek`.
+      // TODO: determine what works best on cloud NIO implementations
+      IOUtils.skipFully(inputStream, nextContainer.containerByteSize);
     } catch (final IOException e) {
       throw new RuntimeException(e);
     }
