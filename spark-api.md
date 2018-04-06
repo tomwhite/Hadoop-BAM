@@ -121,6 +121,11 @@ loaded. Intervals are specified using htsjdk's `Interval` class.
 
 For reading BAM, when intervals are specified it is also possible to load unplaced unmapped reads if desired.
 
+### Partition Guarantees
+
+For reading query name sorted BAM, paired reads should never be split across partitions. This allows
+applications to be sure that a single task will always be able to process read pairs together.
+
 ### Stringency
 
 For reading BAM, the stringency settings from htsjdk are supported.
