@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,6 +34,11 @@ public class SamDatasetTest extends BaseTest {
         {"valid.cram", "valid.fasta", ".bam", 128 * 1024, false},
         {"valid_no_index.cram", "valid.fasta", ".bam", 128 * 1024, false},
     };
+  }
+
+  @AfterClass
+  public static void dump() {
+    DanglingInputStream.dump();
   }
 
   @Test

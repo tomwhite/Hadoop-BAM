@@ -17,7 +17,7 @@ class HadoopFileSystemWrapper implements FileSystemWrapper {
 
   @Override
   public SeekableStream open(Configuration conf, String path) throws IOException {
-    return new SeekableBufferedStream(WrapSeekable.openPath(conf, new Path(path)));
+    return new SeekableBufferedStream(new DanglingInputStream(WrapSeekable.openPath(conf, new Path(path))));
   }
 
   @Override
