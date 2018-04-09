@@ -3,6 +3,7 @@ package org.seqdoop.hadoop_bam.spark;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedInputStream;
+import java.io.Closeable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,7 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.apache.hadoop.io.IOUtils;
 
-public class BamRecordGuesser {
+public class BamRecordGuesser implements Closeable {
 
   private final BlockCompressedInputStream uncompressedBytes;
   private final int                        referenceSequenceCount;
@@ -53,6 +54,11 @@ public class BamRecordGuesser {
     } catch (IOException e) {
       return false;
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    uncompressedBytes.close();
   }
 
   static class Result {

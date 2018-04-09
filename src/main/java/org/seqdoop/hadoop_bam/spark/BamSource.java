@@ -100,50 +100,58 @@ class BamSource implements Serializable {
       throws IOException {
     String path = null;
     BamRecordGuesser bamRecordGuesser = null;
-    BAMFileSpan span = null;
-    long unplacedUnmappedStart = -1;
-    int index = 0; // limit search to MAX_READ_SIZE positions
-    while (bgzfBlocks.hasNext()) {
-      BgzfBlock block = bgzfBlocks.next();
-      if (path == null) { // assume each partition comes from only a single file path
-        path = block.path;
-        try (InputStream headerIn = fileSystemWrapper.open(conf, path)) {
-          SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(headerIn, conf);
-          bamRecordGuesser = getBamRecordGuesser(conf, path, header);
-          if (traversalParametersBroadcast != null) {
-            try (SamReader samReader = createSamReader(conf, path, stringency)) {
-              if (!samReader.hasIndex()) {
-                throw new IllegalArgumentException(
-                    "Intervals set but no BAM index file found for " + path);
+    try {
+      BAMFileSpan span = null;
+      long unplacedUnmappedStart = -1;
+      int index = 0; // limit search to MAX_READ_SIZE positions
+      while (bgzfBlocks.hasNext()) {
+        BgzfBlock block = bgzfBlocks.next();
+        if (path == null) { // assume each partition comes from only a single file path
+          path = block.path;
+          try (InputStream headerIn = fileSystemWrapper.open(conf, path)) {
+            SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(headerIn, conf);
+            bamRecordGuesser = getBamRecordGuesser(conf, path, header);
+            if (traversalParametersBroadcast != null) {
+              try (SamReader samReader = createSamReader(conf, path, stringency)) {
+                if (!samReader.hasIndex()) {
+                  throw new IllegalArgumentException(
+                      "Intervals set but no BAM index file found for " + path);
 
-              }
-              SAMSequenceDictionary dict = header.getSequenceDictionary();
-              BAMIndex idx = samReader.indexing().getIndex();
-              TraversalParameters<T> traversalParameters = traversalParametersBroadcast.getValue();
-              if (traversalParameters.getIntervalsForTraversal() != null) {
-                QueryInterval[] queryIntervals = BoundedTraversalUtil.prepareQueryIntervals(traversalParameters.getIntervalsForTraversal(), dict);
-                span = BAMFileReader.getFileSpan(queryIntervals, idx);
-              }
-              if (traversalParameters.getTraverseUnplacedUnmapped()) {
-                long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
-                if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
-                  unplacedUnmappedStart = startOfLastLinearBin;
+                }
+                SAMSequenceDictionary dict = header.getSequenceDictionary();
+                BAMIndex idx = samReader.indexing().getIndex();
+                TraversalParameters<T> traversalParameters = traversalParametersBroadcast
+                    .getValue();
+                if (traversalParameters.getIntervalsForTraversal() != null) {
+                  QueryInterval[] queryIntervals = BoundedTraversalUtil
+                      .prepareQueryIntervals(traversalParameters.getIntervalsForTraversal(), dict);
+                  span = BAMFileReader.getFileSpan(queryIntervals, idx);
+                }
+                if (traversalParameters.getTraverseUnplacedUnmapped()) {
+                  long startOfLastLinearBin = idx.getStartOfLastLinearBin();
+                  long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
+                  if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
+                    unplacedUnmappedStart = startOfLastLinearBin;
+                  }
                 }
               }
             }
           }
         }
+        for (int up = 0; up < block.uSize; up++) {
+          index++;
+          if (index > MAX_READ_SIZE) {
+            return null;
+          }
+          long vPos = block.pos << 16 | (long) up;
+          if (bamRecordGuesser.checkRecordStart(vPos)) {
+            return new ReadStart(vPos, path, span, unplacedUnmappedStart);
+          }
+        }
       }
-      for (int up = 0; up < block.uSize; up++) {
-        index++;
-        if (index > MAX_READ_SIZE) {
-          return null;
-        }
-        long vPos = block.pos << 16 | (long) up;
-        if (bamRecordGuesser.checkRecordStart(vPos)) {
-          return new ReadStart(vPos, path, span, unplacedUnmappedStart);
-        }
+    } finally {
+      if (bamRecordGuesser != null) {
+        bamRecordGuesser.close();
       }
     }
     return null; // no read found
