@@ -145,6 +145,7 @@ class BamSource implements Serializable {
           }
           long vPos = block.pos << 16 | (long) up;
           if (bamRecordGuesser.checkRecordStart(vPos)) {
+            block.end();
             return new ReadStart(vPos, path, span, unplacedUnmappedStart);
           }
         }
@@ -221,7 +222,8 @@ class BamSource implements Serializable {
           }
           Configuration conf = confSer.getConf();
           String p = readStart.getPath();
-          BAMFileReader bamFileReader = createBamFileReader(conf, p, stringency);
+          SamReader samReader = createSamReader(conf, p, stringency);
+          BAMFileReader bamFileReader = createBamFileReader(samReader);
           BAMFileSpan splitSpan = new BAMFileSpan(readRange);
           BAMFileSpan span = readStart.getSpan();
           TraversalParameters<T> traversal = traversalParametersBroadcast == null ? null : traversalParametersBroadcast.getValue();
@@ -229,31 +231,41 @@ class BamSource implements Serializable {
             Iterator<SAMRecord> intervalReadsIterator;
             if (traversal.getIntervalsForTraversal() == null) {
               intervalReadsIterator = Collections.emptyIterator();
+              samReader.close(); // not needed
             } else {
               span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
               span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
               // TODO: share QueryInterval
               QueryInterval[] queryIntervals = createQueryIntervals(conf, p,
                   traversal.getIntervalsForTraversal());
-              intervalReadsIterator = bamFileReader.createIndexIterator(queryIntervals, false, span.toCoordinateArray());
+              intervalReadsIterator = new AutocloseIteratorWrapper<>(
+                  bamFileReader.createIndexIterator(queryIntervals, false, span.toCoordinateArray()),
+                  samReader);
             }
 
             // add on unplaced unmapped reads if there are any in this range
             if (traversal.getTraverseUnplacedUnmapped() && readStart.getUnplacedUnmappedStart() != -1 &&
                 readRange.getChunkStart() <= readStart.getUnplacedUnmappedStart() &&
                 readStart.getUnplacedUnmappedStart() < readRange.getChunkEnd()) { // TODO correct?
-              Iterator<SAMRecord> unplacedUnmappedReadsIterator = createBamFileReader(conf, p, stringency).queryUnmapped();
+              SamReader unplacedUnmappedReadsSamReader = createSamReader(conf, p, stringency);
+              Iterator<SAMRecord> unplacedUnmappedReadsIterator = new AutocloseIteratorWrapper<>(
+                  createBamFileReader(unplacedUnmappedReadsSamReader).queryUnmapped(),
+                  unplacedUnmappedReadsSamReader);
               return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
             }
             return intervalReadsIterator;
           } else {
-            return bamFileReader.getIterator(splitSpan);
+            return new AutocloseIteratorWrapper<>(bamFileReader.getIterator(splitSpan), samReader);
           }
         });
   }
 
-  private BAMFileReader createBamFileReader(Configuration conf, String path, ValidationStringency stringency) throws IOException {
-    return (BAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) createSamReader(conf, path, stringency)).underlyingReader();
+  private BAMFileReader createBamFileReader(SamReader samReader) {
+    BAMFileReader bamFileReader = (BAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
+    if (bamFileReader.hasIndex()) {
+      bamFileReader.getIndex(); // force BAMFileReader#mIndex to be populated so the index stream is properly closed by the close() method
+    }
+    return bamFileReader;
   }
 
   private SeekableStream findIndex(Configuration conf, String path) throws IOException {

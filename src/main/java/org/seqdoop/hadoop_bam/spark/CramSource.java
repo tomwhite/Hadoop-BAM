@@ -98,48 +98,52 @@ class CramSource implements Serializable {
           }
           Configuration c = confSer.getConf();
           String p = fileSplit.getPath().toString();
-          CRAMFileReader cramFileReader = createCramFileReader(c, p, validationStringency, referenceSourcePath);
+          SamReader samReader = createSamReader(c, p, validationStringency, referenceSourcePath);
+          CRAMFileReader cramFileReader = createCramFileReader(samReader);
           // TODO: test edge cases
           // Subtract one from end since CRAMIterator's boundaries are inclusive
           Chunk readRange = new Chunk(newStart << 16, (newEnd - 1) << 16);
           BAMFileSpan splitSpan = new BAMFileSpan(readRange);
           TraversalParameters<T> traversal = traversalParametersBroadcast == null ? null : traversalParametersBroadcast.getValue();
           if (traversal != null) {
-            try (SamReader samReader = createSamReader(c, p, validationStringency, referenceSourcePath)) {
-              SAMFileHeader header = samReader.getFileHeader();
-              SAMSequenceDictionary dict = header.getSequenceDictionary();
-              BAMIndex idx = samReader.indexing().getIndex();
-              Iterator<SAMRecord> intervalReadsIterator;
-              if (traversal.getIntervalsForTraversal() == null) {
-                intervalReadsIterator = Collections.emptyIterator();
-              } else {
-                QueryInterval[] queryIntervals = BoundedTraversalUtil.prepareQueryIntervals(traversal.getIntervalsForTraversal(), dict);
-                BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
-                span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
-                span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
-                SeekableStream ss = fileSystemWrapper.open(c, p);
-                // TODO: should go through FileSystemWrapper
-                ReferenceSource referenceSource = new ReferenceSource(NIOFileUtil.asPath(referenceSourcePath));
-                return new CRAMIntervalIterator(queryIntervals, false, idx, ss, referenceSource, validationStringency, span.toCoordinateArray());
-              }
+            SAMFileHeader header = samReader.getFileHeader();
+            SAMSequenceDictionary dict = header.getSequenceDictionary();
+            BAMIndex idx = samReader.indexing().getIndex();
+            Iterator<SAMRecord> intervalReadsIterator;
+            if (traversal.getIntervalsForTraversal() == null) {
+              intervalReadsIterator = Collections.emptyIterator();
+              samReader.close(); // not needed
+            } else {
+              QueryInterval[] queryIntervals = BoundedTraversalUtil.prepareQueryIntervals(traversal.getIntervalsForTraversal(), dict);
+              BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
+              span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
+              span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
+              SeekableStream ss = fileSystemWrapper.open(c, p);
+              // TODO: should go through FileSystemWrapper
+              ReferenceSource referenceSource = new ReferenceSource(NIOFileUtil.asPath(referenceSourcePath));
+              intervalReadsIterator = new AutocloseIteratorWrapper<>(new CRAMIntervalIterator(queryIntervals, false, idx, ss, referenceSource, validationStringency, span.toCoordinateArray()), ss);
+              samReader.close(); // not needed
+            }
 
-              // add on unplaced unmapped reads if there are any in this range
-              if (traversal.getTraverseUnplacedUnmapped()) {
-                long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
-                if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
-                  long unplacedUnmappedStart = startOfLastLinearBin;
-                  if (readRange.getChunkStart() <= unplacedUnmappedStart &&
-                      unplacedUnmappedStart < readRange.getChunkEnd()) { // TODO correct?
-                    Iterator<SAMRecord> unplacedUnmappedReadsIterator = createCramFileReader(c, p, validationStringency, referenceSourcePath).queryUnmapped();
-                    return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
-                  }
+            // add on unplaced unmapped reads if there are any in this range
+            if (traversal.getTraverseUnplacedUnmapped()) {
+              long startOfLastLinearBin = idx.getStartOfLastLinearBin();
+              long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
+              if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
+                long unplacedUnmappedStart = startOfLastLinearBin;
+                if (readRange.getChunkStart() <= unplacedUnmappedStart &&
+                    unplacedUnmappedStart < readRange.getChunkEnd()) { // TODO correct?
+                  SamReader unplacedUnmappedReadsSamReader = createSamReader(c, p, validationStringency, referenceSourcePath);
+                  Iterator<SAMRecord> unplacedUnmappedReadsIterator = new AutocloseIteratorWrapper<>(
+                      createCramFileReader(unplacedUnmappedReadsSamReader).queryUnmapped(),
+                      unplacedUnmappedReadsSamReader);
+                  return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
                 }
               }
-              return intervalReadsIterator;
             }
+            return intervalReadsIterator;
           } else {
-            return cramFileReader.getIterator(splitSpan);
+            return new AutocloseIteratorWrapper<>(cramFileReader.getIterator(splitSpan), samReader);
           }
         });
   }
@@ -190,8 +194,8 @@ class CramSource implements Serializable {
     return offset;
   }
 
-  private CRAMFileReader createCramFileReader(Configuration conf, String path, ValidationStringency stringency, String referenceSourcePath) throws IOException {
-    return (CRAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) createSamReader(conf, path, stringency, referenceSourcePath)).underlyingReader();
+  private CRAMFileReader createCramFileReader(SamReader samReader) throws IOException {
+    return (CRAMFileReader) ((PrimitiveSamReaderToSamReaderAdapter) samReader).underlyingReader();
   }
 
   private SeekableStream findIndex(Configuration conf, String path) throws IOException {

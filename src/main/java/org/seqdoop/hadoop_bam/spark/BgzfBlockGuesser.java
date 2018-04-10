@@ -30,7 +30,20 @@ public class BgzfBlockGuesser implements Closeable {
     public long pos;
     public int cSize;
     public int uSize;
-    public BgzfBlock(String pa, long p, int cs, int us) { path = pa; pos = p; cSize = cs; uSize = us; }
+    private SeekableStream in;
+
+    public BgzfBlock(String pa, long p, int cs, int us, SeekableStream in) {
+      path = pa; pos = p; cSize = cs; uSize = us;
+      this.in = in;
+    }
+
+    /**
+     * Signals that this is the last block in a partition, and that the guesser should close its resources.
+     * @throws IOException
+     */
+    public void end() throws IOException {
+      in.close();
+    }
 
     @Override
     public String toString() {
@@ -110,7 +123,7 @@ public class BgzfBlockGuesser implements Closeable {
         p += bsize - xlen - 19 + 4;
         in.seek(p);
         IOUtils.readFully(in, buf.array(), 0, 4);
-        return new BgzfBlock(path, p0, (int) (p + 4 - p0), buf.getInt(0));
+        return new BgzfBlock(path, p0, (int) (p + 4 - p0), buf.getInt(0), in);
       }
       // No luck: look for the next gzip block header. Start right after
       // where we last saw the identifiers, although we could probably
