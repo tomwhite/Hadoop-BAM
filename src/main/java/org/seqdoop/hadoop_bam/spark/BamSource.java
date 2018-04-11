@@ -191,8 +191,8 @@ class BamSource implements Serializable {
         readRange = null;
       } else {
         long readStartPos = readStart.getVirtualStart();
-        long readEnd = -1;
-        // if there's another read start in the same file, use it as end (otherwise set it as file end)
+        long readEnd = fileSystemWrapper.getFileLength(jsc.hadoopConfiguration(), readStart.getPath()) << 16;
+        // if there's another read start in the same file, use it as end (otherwise leave it as file end)
         for (int j = i + 1; j < readStarts.size(); j++) {
           ReadStart nextReadStart = readStarts.get(j);
           if (nextReadStart == null) {
@@ -202,9 +202,6 @@ class BamSource implements Serializable {
             readEnd = nextReadStart.getVirtualStart();
           }
           break;
-        }
-        if (readEnd == 0) {
-          readEnd = fileSystemWrapper.getFileLength(jsc.hadoopConfiguration(), readStart.getPath()) << 16;
         }
         readRange = new Chunk(readStartPos, readEnd);
       }
