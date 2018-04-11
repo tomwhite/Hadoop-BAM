@@ -30,7 +30,7 @@ public class BgzfBlockGuesser implements Closeable {
     public long pos;
     public int cSize;
     public int uSize;
-    private SeekableStream in;
+    private transient SeekableStream in;
 
     public BgzfBlock(String pa, long p, int cs, int us, SeekableStream in) {
       path = pa; pos = p; cSize = cs; uSize = us;
@@ -49,7 +49,7 @@ public class BgzfBlockGuesser implements Closeable {
     public String toString() {
       return "BgzfBlock{" +
           "path=" + path +
-          "pos=" + pos +
+          ", pos=" + pos +
           ", cSize=" + cSize +
           ", uSize=" + uSize +
           '}';
