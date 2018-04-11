@@ -104,7 +104,10 @@ class BamSource implements Serializable {
             return null;
           }
           long vPos = block.pos << 16 | (long) up;
-          long vEnd = block.end << 16;
+          // As the guesser goes to the next BGZF block before looking for BAM
+          // records, the ending BGZF blocks have to always be traversed fully.
+          // Hence force the length to be 0xffff, the maximum possible.
+          long vEnd = block.end << 16 | 0xffff;
           if (bamRecordGuesser.checkRecordStart(vPos)) {
             block.end();
             return new ReadRange(partitionPath, new Chunk(vPos, vEnd));
