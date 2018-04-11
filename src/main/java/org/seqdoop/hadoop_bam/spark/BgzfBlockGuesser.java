@@ -30,10 +30,11 @@ public class BgzfBlockGuesser implements Closeable {
     public long pos;
     public int cSize;
     public int uSize;
+    public long end;
     private transient SeekableStream in;
 
-    public BgzfBlock(String pa, long p, int cs, int us, SeekableStream in) {
-      path = pa; pos = p; cSize = cs; uSize = us;
+    public BgzfBlock(String pa, long p, int cs, int us, long e, SeekableStream in) {
+      path = pa; pos = p; cSize = cs; uSize = us; end = e;
       this.in = in;
     }
 
@@ -52,6 +53,7 @@ public class BgzfBlockGuesser implements Closeable {
           ", pos=" + pos +
           ", cSize=" + cSize +
           ", uSize=" + uSize +
+          ", end=" + end +
           '}';
     }
   }
@@ -123,7 +125,7 @@ public class BgzfBlockGuesser implements Closeable {
         p += bsize - xlen - 19 + 4;
         in.seek(p);
         IOUtils.readFully(in, buf.array(), 0, 4);
-        return new BgzfBlock(path, p0, (int) (p + 4 - p0), buf.getInt(0), in);
+        return new BgzfBlock(path, p0, (int) (p + 4 - p0), buf.getInt(0), end, in);
       }
       // No luck: look for the next gzip block header. Start right after
       // where we last saw the identifiers, although we could probably

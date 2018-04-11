@@ -20,7 +20,6 @@ import htsjdk.samtools.util.Locatable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -32,7 +31,6 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.seqdoop.hadoop_bam.spark.BgzfBlockGuesser.BgzfBlock;
 import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
-import scala.Tuple2;
 
 /**
  * Load reads from a BAM file on Spark.
@@ -80,62 +78,24 @@ class BamSource implements Serializable {
   }
 
   /**
-   * @return an RDD for the first read starting in each partition, or null for partitions
-   * that don't have a read starting in them.
-   */
-  <T extends Locatable> JavaRDD<ReadStart> getReadStarts(JavaSparkContext jsc, String path, int splitSize, Broadcast<TraversalParameters<T>> traversalParametersBroadcast, ValidationStringency stringency)
-      throws IOException {
-    Configuration conf = jsc.hadoopConfiguration();
-    SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(conf);
-    return bgzfBlockSource.getBgzfBlocks(jsc, path, splitSize)
-        .mapPartitions((FlatMapFunction<Iterator<BgzfBlock>, ReadStart>) bgzfBlocks -> Collections
-            .singletonList(getFirstReadInPartition(confSer.getConf(), bgzfBlocks, traversalParametersBroadcast, stringency)).iterator());
-  }
-
-  /**
-   * @return the first read starting in the partition, or null if there is none (e.g. in the case
+   * @return the {@link ReadRange} for the partition, or null if there is none (e.g. in the case
    * of long reads, and/or very small partitions).
    */
-  private <T extends Locatable> ReadStart getFirstReadInPartition(Configuration conf, Iterator<BgzfBlock> bgzfBlocks, Broadcast<TraversalParameters<T>> traversalParametersBroadcast, ValidationStringency stringency)
+  private <T extends Locatable> ReadRange getFirstReadInPartition(Configuration conf, Iterator<BgzfBlock> bgzfBlocks)
       throws IOException {
-    String path = null;
+    ReadRange readRange = null;
     BamRecordGuesser bamRecordGuesser = null;
     try {
-      BAMFileSpan span = null;
-      long unplacedUnmappedStart = -1;
+      String partitionPath = null;
       int index = 0; // limit search to MAX_READ_SIZE positions
+      outer:
       while (bgzfBlocks.hasNext()) {
         BgzfBlock block = bgzfBlocks.next();
-        if (path == null) { // assume each partition comes from only a single file path
-          path = block.path;
-          try (InputStream headerIn = fileSystemWrapper.open(conf, path)) {
+        if (partitionPath == null) { // assume each partition comes from only a single file path
+          partitionPath = block.path;
+          try (InputStream headerIn = fileSystemWrapper.open(conf, partitionPath)) {
             SAMFileHeader header = SAMHeaderReader.readSAMHeaderFrom(headerIn, conf);
-            bamRecordGuesser = getBamRecordGuesser(conf, path, header);
-            if (traversalParametersBroadcast != null) {
-              try (SamReader samReader = createSamReader(conf, path, stringency)) {
-                if (!samReader.hasIndex()) {
-                  throw new IllegalArgumentException(
-                      "Intervals set but no BAM index file found for " + path);
-
-                }
-                SAMSequenceDictionary dict = header.getSequenceDictionary();
-                BAMIndex idx = samReader.indexing().getIndex();
-                TraversalParameters<T> traversalParameters = traversalParametersBroadcast
-                    .getValue();
-                if (traversalParameters.getIntervalsForTraversal() != null) {
-                  QueryInterval[] queryIntervals = BoundedTraversalUtil
-                      .prepareQueryIntervals(traversalParameters.getIntervalsForTraversal(), dict);
-                  span = BAMFileReader.getFileSpan(queryIntervals, idx);
-                }
-                if (traversalParameters.getTraverseUnplacedUnmapped()) {
-                  long startOfLastLinearBin = idx.getStartOfLastLinearBin();
-                  long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
-                  if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
-                    unplacedUnmappedStart = startOfLastLinearBin;
-                  }
-                }
-              }
-            }
+            bamRecordGuesser = getBamRecordGuesser(conf, partitionPath, header);
           }
         }
         for (int up = 0; up < block.uSize; up++) {
@@ -144,9 +104,10 @@ class BamSource implements Serializable {
             return null;
           }
           long vPos = block.pos << 16 | (long) up;
+          long vEnd = block.end << 16;
           if (bamRecordGuesser.checkRecordStart(vPos)) {
             block.end();
-            return new ReadStart(vPos, path, span, unplacedUnmappedStart);
+            return new ReadRange(partitionPath, new Chunk(vPos, vEnd));
           }
         }
       }
@@ -155,7 +116,7 @@ class BamSource implements Serializable {
         bamRecordGuesser.close();
       }
     }
-    return null; // no read found
+    return readRange;
   }
 
   private BamRecordGuesser getBamRecordGuesser(Configuration conf, String path, SAMFileHeader header) throws IOException {
@@ -179,83 +140,64 @@ class BamSource implements Serializable {
     }
 
     Broadcast<TraversalParameters<T>> traversalParametersBroadcast = traversalParameters == null ? null : jsc.broadcast(traversalParameters);
-    JavaRDD<ReadStart> readStartsRdd = getReadStarts(jsc, path, splitSize, traversalParametersBroadcast, stringency);
-    List<ReadStart> readStarts = readStartsRdd.collect();
-    // Find the end of the partition, which is either the start of the read in the next partition,
-    // or the end of the file if a partition is the last for a file.
-    List<Chunk> readRanges = new ArrayList<>();
-    for (int i = 0; i < readStarts.size(); i++) {
-      ReadStart readStart = readStarts.get(i);
-      Chunk readRange;
-      if (readStart == null) {
-        readRange = null;
-      } else {
-        long readStartPos = readStart.getVirtualStart();
-        long readEnd = fileSystemWrapper.getFileLength(jsc.hadoopConfiguration(), readStart.getPath()) << 16;
-        // if there's another read start in the same file, use it as end (otherwise leave it as file end)
-        for (int j = i + 1; j < readStarts.size(); j++) {
-          ReadStart nextReadStart = readStarts.get(j);
-          if (nextReadStart == null) {
-            continue;
-          }
-          if (readStart.getPath().equals(nextReadStart.getPath())) {
-            readEnd = nextReadStart.getVirtualStart();
-          }
-          break;
-        }
-        readRange = new Chunk(readStartPos, readEnd);
-      }
-      readRanges.add(readRange);
-    }
-
     SerializableHadoopConfiguration confSer = new SerializableHadoopConfiguration(jsc.hadoopConfiguration());
 
-    JavaRDD<Chunk> readRangesRdd = jsc.parallelize(readRanges, readRanges.size());
-    return readStartsRdd
-        .zip(readRangesRdd) // one element per partition
-        .mapPartitions((FlatMapFunction<Iterator<Tuple2<ReadStart, Chunk>>, SAMRecord>) it -> {
-          Tuple2<ReadStart, Chunk> tuple = it.next();
-          ReadStart readStart = tuple._1();
-          Chunk readRange = tuple._2();
+    return bgzfBlockSource.getBgzfBlocks(jsc, path, splitSize)
+        .mapPartitions((FlatMapFunction<Iterator<BgzfBlock>, SAMRecord>) bgzfBlocks -> {
+          Configuration conf = confSer.getConf();
+          ReadRange readRange = getFirstReadInPartition(conf, bgzfBlocks);
           if (readRange == null) {
             return Collections.emptyIterator();
           }
-          Configuration conf = confSer.getConf();
-          String p = readStart.getPath();
+          String p = readRange.getPath();
           SamReader samReader = createSamReader(conf, p, stringency);
           BAMFileReader bamFileReader = createBamFileReader(samReader);
-          BAMFileSpan splitSpan = new BAMFileSpan(readRange);
-          BAMFileSpan span = readStart.getSpan();
+          BAMFileSpan splitSpan = new BAMFileSpan(readRange.getSpan());
           TraversalParameters<T> traversal = traversalParametersBroadcast == null ? null : traversalParametersBroadcast.getValue();
-          if (traversal != null) {
+          if (traversal == null) {
+            // no intervals or unplaced, unmapped reads
+            return new AutocloseIteratorWrapper<>(bamFileReader.getIterator(splitSpan), samReader);
+          } else {
+            if (!samReader.hasIndex()) {
+              throw new IllegalArgumentException(
+                  "Intervals set but no BAM index file found for " + p);
+
+            }
+            BAMIndex idx = samReader.indexing().getIndex();
             Iterator<SAMRecord> intervalReadsIterator;
             if (traversal.getIntervalsForTraversal() == null) {
               intervalReadsIterator = Collections.emptyIterator();
-              samReader.close(); // not needed
             } else {
-              span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
-              span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
-              // TODO: share QueryInterval
               QueryInterval[] queryIntervals = createQueryIntervals(conf, p,
                   traversal.getIntervalsForTraversal());
+              BAMFileSpan span = BAMFileReader.getFileSpan(queryIntervals, idx);
+              span = (BAMFileSpan) span.removeContentsBefore(splitSpan);
+              span = (BAMFileSpan) span.removeContentsAfter(splitSpan);
               intervalReadsIterator = new AutocloseIteratorWrapper<>(
                   bamFileReader.createIndexIterator(queryIntervals, false, span.toCoordinateArray()),
                   samReader);
             }
 
             // add on unplaced unmapped reads if there are any in this range
-            if (traversal.getTraverseUnplacedUnmapped() && readStart.getUnplacedUnmappedStart() != -1 &&
-                readRange.getChunkStart() <= readStart.getUnplacedUnmappedStart() &&
-                readStart.getUnplacedUnmappedStart() < readRange.getChunkEnd()) { // TODO correct?
-              SamReader unplacedUnmappedReadsSamReader = createSamReader(conf, p, stringency);
-              Iterator<SAMRecord> unplacedUnmappedReadsIterator = new AutocloseIteratorWrapper<>(
-                  createBamFileReader(unplacedUnmappedReadsSamReader).queryUnmapped(),
-                  unplacedUnmappedReadsSamReader);
-              return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
+            if (traversal.getTraverseUnplacedUnmapped()) {
+              long startOfLastLinearBin = idx.getStartOfLastLinearBin();
+              long noCoordinateCount = ((AbstractBAMFileIndex) idx).getNoCoordinateCount();
+              if (startOfLastLinearBin != -1 && noCoordinateCount > 0) {
+                long unplacedUnmappedStart = startOfLastLinearBin;
+                if (readRange.getSpan().getChunkStart() <= unplacedUnmappedStart &&
+                    unplacedUnmappedStart < readRange.getSpan().getChunkEnd()) { // TODO correct?
+                  SamReader unplacedUnmappedReadsSamReader = createSamReader(conf, p, stringency);
+                  Iterator<SAMRecord> unplacedUnmappedReadsIterator = new AutocloseIteratorWrapper<>(
+                      createBamFileReader(unplacedUnmappedReadsSamReader).queryUnmapped(),
+                      unplacedUnmappedReadsSamReader);
+                  return Iterators.concat(intervalReadsIterator, unplacedUnmappedReadsIterator);
+                }
+              }
+              if (traversal.getIntervalsForTraversal() == null) {
+                samReader.close(); // not used any more
+              }
             }
             return intervalReadsIterator;
-          } else {
-            return new AutocloseIteratorWrapper<>(bamFileReader.getIterator(splitSpan), samReader);
           }
         });
   }
@@ -306,36 +248,22 @@ class BamSource implements Serializable {
   }
 
   /**
-   * Stores the position of the first BAM record found in a partition, along with information to
-   * support bounded traversal (intervals and whether to return unplaced, unmapped reads).
+   * Stores the virtual span of a partition, from the start of the first read, to the end of the partition.
    */
-  static class ReadStart implements Serializable {
-    private final long virtualStart;
+  static class ReadRange implements Serializable {
     private final String path;
-    private final BAMFileSpan span;
-    private long unplacedUnmappedStart;
-
-    public ReadStart(long virtualStart, String path, BAMFileSpan span, long unplacedUnmappedStart) {
-      this.virtualStart = virtualStart;
+    private final Chunk span;
+    public ReadRange(String path, Chunk span) {
       this.path = path;
       this.span = span;
-      this.unplacedUnmappedStart = unplacedUnmappedStart;
-    }
-
-    public long getVirtualStart() {
-      return virtualStart;
     }
 
     public String getPath() {
       return path;
     }
 
-    public BAMFileSpan getSpan() {
+    public Chunk getSpan() {
       return span;
-    }
-
-    public long getUnplacedUnmappedStart() {
-      return unplacedUnmappedStart;
     }
   }
 }
