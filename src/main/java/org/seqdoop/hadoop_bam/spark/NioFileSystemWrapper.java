@@ -5,6 +5,7 @@ import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.seqdoop.hadoop_bam.util.NIOFileUtil;
@@ -45,7 +46,9 @@ class NioFileSystemWrapper implements FileSystemWrapper {
   public void concat(Configuration conf, List<String> parts, String path) throws IOException {
     try (OutputStream out = create(conf, path)) {
       for (final String part : parts) {
-        Files.copy(NIOFileUtil.asPath(part), out);
+        Path src = NIOFileUtil.asPath(part);
+        Files.copy(src, out);
+        Files.delete(src);
       }
     }
   }
