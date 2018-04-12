@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.apache.hadoop.io.IOUtils;
 
-public class BamRecordGuesser implements Closeable {
+class BamRecordGuesser implements Closeable {
 
   private final BlockCompressedInputStream uncompressedBytes;
   private final DataInputStream uncompressedBytesData;

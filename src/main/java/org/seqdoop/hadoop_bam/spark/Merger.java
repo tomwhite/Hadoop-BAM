@@ -3,7 +3,7 @@ package org.seqdoop.hadoop_bam.spark;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 
-public class Merger {
+class Merger {
 
   private final FileSystemWrapper fileSystemWrapper;
 

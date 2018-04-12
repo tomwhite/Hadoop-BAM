@@ -7,7 +7,7 @@ import org.apache.hadoop.conf.Configuration;
 /**
  * A wrapper around {@link Configuration} that allows configuration to be passed to a Spark task.
  */
-public class SerializableHadoopConfiguration implements Serializable {
+class SerializableHadoopConfiguration implements Serializable {
   Configuration conf;
 
   public SerializableHadoopConfiguration(Configuration hadoopConf) {

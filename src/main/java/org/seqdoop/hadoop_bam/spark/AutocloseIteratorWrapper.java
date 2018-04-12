@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  * An {@link Iterator} that automatically closes a resource when the end of the iteration is reached.
  * @param <E>
  */
-public class AutocloseIteratorWrapper<E> implements Iterator<E> {
+class AutocloseIteratorWrapper<E> implements Iterator<E> {
 
   private final Iterator<E> iterator;
   private final Closeable closeable;

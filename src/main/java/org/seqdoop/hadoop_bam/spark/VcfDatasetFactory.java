@@ -6,6 +6,11 @@ import java.io.IOException;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 
+/**
+ * <p>
+ * The entry point for reading or writing a {@link VcfDataset}.
+ * </p>
+ */
 public class VcfDatasetFactory {
 
   private JavaSparkContext sparkContext;

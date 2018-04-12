@@ -13,6 +13,13 @@ import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
+/**
+ * <p>
+ * An output format for writing {@link SAMRecord} objects to BAM files. Should not be used directly.
+ * </p>
+ *
+ * @see SamDataset
+ */
 public class BamOutputFormat extends FileOutputFormat<Void, SAMRecord> {
 
   static class BamRecordWriter extends RecordWriter<Void, SAMRecord> {

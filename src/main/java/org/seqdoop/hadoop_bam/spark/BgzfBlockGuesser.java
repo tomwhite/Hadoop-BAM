@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.apache.hadoop.io.IOUtils;
 
-public class BgzfBlockGuesser implements Closeable {
+class BgzfBlockGuesser implements Closeable {
 
   protected final static int BGZF_MAGIC     = 0x04088b1f;
   protected final static int BGZF_MAGIC_SUB = 0x00024342;

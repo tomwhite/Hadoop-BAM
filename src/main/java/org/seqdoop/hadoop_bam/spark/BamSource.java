@@ -30,12 +30,14 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.seqdoop.hadoop_bam.spark.BgzfBlockGuesser.BgzfBlock;
+import org.seqdoop.hadoop_bam.spark.htsjdk_contrib.SeekableBufferedStream;
 import org.seqdoop.hadoop_bam.util.SAMHeaderReader;
 
 /**
  * Load reads from a BAM file on Spark.
  *
  * @see BamSink
+ * @see SamDataset
  */
 class BamSource implements Serializable {
 

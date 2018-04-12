@@ -38,6 +38,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.broadcast.Broadcast;
+import org.seqdoop.hadoop_bam.spark.htsjdk_contrib.CramContainerHeaderIterator;
 import org.seqdoop.hadoop_bam.util.NIOFileUtil;
 import scala.Tuple2;
 

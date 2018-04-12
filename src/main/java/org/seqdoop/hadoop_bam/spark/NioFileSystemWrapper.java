@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
+import org.seqdoop.hadoop_bam.spark.htsjdk_contrib.SeekableBufferedStream;
 import org.seqdoop.hadoop_bam.util.NIOFileUtil;
 
 class NioFileSystemWrapper implements FileSystemWrapper {

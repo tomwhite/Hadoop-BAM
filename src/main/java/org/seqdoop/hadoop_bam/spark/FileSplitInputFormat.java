@@ -7,6 +7,12 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
+/**
+ * <p>
+ * An input format for reading information about file splits so as to preserve Hadoop file locality.
+ * Should not be used directly.
+ * </p>
+ */
 public class FileSplitInputFormat extends FileInputFormat<Void, FileSplit> {
 
   static class FileSplitRecordReader extends RecordReader<Void, FileSplit> {

@@ -1,4 +1,4 @@
-package org.seqdoop.hadoop_bam.spark;
+package org.seqdoop.hadoop_bam.spark.htsjdk_contrib;
 
 import htsjdk.samtools.cram.build.CramContainerIterator;
 import htsjdk.samtools.cram.build.CramIO;
@@ -14,6 +14,8 @@ import org.apache.hadoop.io.IOUtils;
  * Iterate over CRAM containers from an input stream, and unlike {@link CramContainerIterator}
  * only the header of each container is read, rather than the whole stream. As a result, the
  * container data is *not* populated.
+ *
+ * TODO: Move to htsjdk.
  */
 public class CramContainerHeaderIterator implements Iterator<Container> {
   private CramHeader cramHeader;

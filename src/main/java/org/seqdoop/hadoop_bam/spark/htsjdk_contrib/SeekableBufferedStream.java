@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-package org.seqdoop.hadoop_bam.spark;
+package org.seqdoop.hadoop_bam.spark.htsjdk_contrib;
 
 import htsjdk.samtools.seekablestream.SeekableStream;
 import java.io.BufferedInputStream;
@@ -33,6 +33,8 @@ import java.io.InputStream;
  * A wrapper class to provide buffered read access to a SeekableStream.  Just wrapping such a stream with
  * a BufferedInputStream will not work as it does not support seeking.  In this implementation a
  * seek call is delegated to the wrapped stream, and the buffer reset.
+ *
+ * TODO: Contribute changes back to htsjdk.
  */
 public class SeekableBufferedStream extends SeekableStream {
 

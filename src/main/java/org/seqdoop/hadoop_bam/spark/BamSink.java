@@ -16,6 +16,12 @@ import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.broadcast.Broadcast;
 import scala.Tuple2;
 
+/**
+ * Write reads to a BAM file on Spark.
+ *
+ * @see BamSource
+ * @see SamDataset
+ */
 class BamSink {
 
   private FileSystemWrapper fileSystemWrapper = new HadoopFileSystemWrapper();
