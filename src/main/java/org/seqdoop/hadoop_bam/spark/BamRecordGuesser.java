@@ -4,7 +4,6 @@ import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedInputStream;
 import java.io.Closeable;
-import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,7 +14,6 @@ import org.apache.hadoop.io.IOUtils;
 class BamRecordGuesser implements Closeable {
 
   private final BlockCompressedInputStream uncompressedBytes;
-  private final DataInputStream uncompressedBytesData;
   private final int                        referenceSequenceCount;
   private final SAMFileHeader header;
   private final int readsToCheck = 10;
@@ -30,11 +28,15 @@ class BamRecordGuesser implements Closeable {
           .allocate(255)
           .order(ByteOrder.LITTLE_ENDIAN);
 
+  private final ByteBuffer cigarOpBuffer =
+      ByteBuffer
+          .allocate(4)
+          .order(ByteOrder.LITTLE_ENDIAN);
+
   public BamRecordGuesser(SeekableStream ss,
       int referenceSequenceCount,
       SAMFileHeader header) {
     this.uncompressedBytes = new BlockCompressedInputStream(ss);
-    this.uncompressedBytesData = new DataInputStream(uncompressedBytes);
     this.referenceSequenceCount = referenceSequenceCount;
     this.header = header;
   }
@@ -173,7 +175,8 @@ class BamRecordGuesser implements Closeable {
     }
 
     for (int i = 0; i < numCigarOps; i++) {
-      int read = uncompressedBytesData.readInt();
+      readFully(uncompressedBytes, cigarOpBuffer.array(), 0, 4);
+      int read = cigarOpBuffer.getInt(0);
       if (read == -1) {
         throw new EOFException();
       }
