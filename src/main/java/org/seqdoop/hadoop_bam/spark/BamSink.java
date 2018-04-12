@@ -47,7 +47,7 @@ class BamSink {
   }
 
   private void writeHeader(SAMFileHeader header, OutputStream out) throws IOException {
-    // TODO: this is private in htsjdk
+    // TODO: this is copied from htsjdk BAMFileWriter#writeHeader, which is protected.
     final StringWriter headerTextBuffer = new StringWriter();
     new SAMTextHeaderCodec().encode(headerTextBuffer, header);
     final String headerText = headerTextBuffer.toString();
