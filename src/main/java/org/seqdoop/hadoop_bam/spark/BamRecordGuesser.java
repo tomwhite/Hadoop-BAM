@@ -4,6 +4,7 @@ import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.samtools.util.BlockCompressedInputStream;
 import java.io.Closeable;
+import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +15,7 @@ import org.apache.hadoop.io.IOUtils;
 public class BamRecordGuesser implements Closeable {
 
   private final BlockCompressedInputStream uncompressedBytes;
+  private final DataInputStream uncompressedBytesData;
   private final int                        referenceSequenceCount;
   private final SAMFileHeader header;
   private final int readsToCheck = 10;
@@ -32,6 +34,7 @@ public class BamRecordGuesser implements Closeable {
       int referenceSequenceCount,
       SAMFileHeader header) {
     this.uncompressedBytes = new BlockCompressedInputStream(ss);
+    this.uncompressedBytesData = new DataInputStream(uncompressedBytes);
     this.referenceSequenceCount = referenceSequenceCount;
     this.header = header;
   }
@@ -82,39 +85,28 @@ public class BamRecordGuesser implements Closeable {
   private static final Result NO_START = new Result(false, -1);
 
   private Result checkRecordStartInternal(long vPos) throws IOException {
+    // The fields in a BAM record, are as follows, plus auxiliary data at the end (ignored here)
+    //
+    // Field      Length (bytes)   Cumulative offset (bytes)
+    // ---------- ---------------- ---------------------------------------------
+    // block_size 4                0
+    // refID      4                4
+    // pos        4                8
+    // bin_mq_nl  4                12
+    // flag_nc    4                16
+    // l_seq      4                20
+    // next_refID 4                24
+    // next_pos   4                28
+    // t_len      4                32
+    // read_name  l_read_name      36 + l_read_name
+    // cigar      n_cigar_op       36 + l_read_name
+    // seq        (l_seq + 1)/2    36 + l_read_name + n_cigar_op
+    // qual       l_seq            36 + l_read_name + n_cigar_op + (l_seq + 1)/2
+
     seek(uncompressedBytes, vPos);
     readFully(uncompressedBytes, buf.array(), 0, 36);
 
     final int remainingBytes = buf.getInt(0);
-
-    // BAM format
-    //
-    //   0                   1                   2                   3                   4                   5                   6                   7
-    //   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  | block_size    | refID         | pos           | bin_mq_nl     | flag_nc       | l_seq         | next_refID    | next_pos      | t_len         |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  |                               |
-    //  : read_name (l_read_name bytes) :
-    //  |                               |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  |                               |
-    //  : cigar (n_cigar_op bytes)      :
-    //  |                               |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  |                               |
-    //  : seq ((l_seq + 1)/2 bytes)     :
-    //  |                               |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  |                               |
-    //  : qual (l_seq bytes)            :
-    //  |                               |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //  |                               |
-    //  : auxilary data                 :
-    //  |                               |
-    //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    //
 
     // If the first two checks fail we have what looks like a valid
     // reference sequence ID. Assume we're at offset [4] or [24], i.e.
@@ -181,7 +173,7 @@ public class BamRecordGuesser implements Closeable {
     }
 
     for (int i = 0; i < numCigarOps; i++) {
-      int read = uncompressedBytes.read();
+      int read = uncompressedBytesData.readInt();
       if (read == -1) {
         throw new EOFException();
       }
